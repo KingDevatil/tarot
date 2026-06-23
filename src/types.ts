@@ -6,7 +6,7 @@ export type SpreadId = 'single' | 'three_trend' | 'relationship_5';
 
 export type Orientation = 'upright' | 'reversed';
 
-export type AppView = 'home' | 'reading' | 'result' | 'history' | 'library';
+export type AppView = 'home' | 'reading' | 'result' | 'history' | 'library' | 'settings';
 
 export type ParamKey =
   | 'timeRange'
@@ -85,4 +85,33 @@ export interface ReadingResult {
   cards: DrawnCard[];
   summary: string;
   advice: string;
+  llmAnalysis?: LlmAnalysis;
+}
+
+export interface LlmCardInterpretation {
+  positionId: string;
+  label: string;
+  cardName: string;
+  orientation: Orientation;
+  interpretation: string;
+}
+
+export interface LlmAnalysis {
+  overview: string;
+  cards: LlmCardInterpretation[];
+  advice: string[];
+  emotionalFeedback: string;
+  riskNotes: string[];
+  source: 'llm';
+  model: string;
+  generatedAt: string;
+}
+
+export interface LlmConfig {
+  enabled: boolean;
+  endpoint: string;
+  model: string;
+  apiKey: string;
+  temperature: number;
+  timeoutMs: number;
 }

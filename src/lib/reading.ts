@@ -113,6 +113,12 @@ export const saveReading = (reading: ReadingResult) => {
   localStorage.setItem(HISTORY_KEY, JSON.stringify([reading, ...history].slice(0, 20)));
 };
 
+export const updateSavedReading = (reading: ReadingResult) => {
+  const history = loadHistory();
+  const nextHistory = history.map((item) => (item.id === reading.id ? reading : item));
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
+};
+
 export const clearHistory = () => {
   localStorage.removeItem(HISTORY_KEY);
 };

@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage';
 import { LibraryPage } from './pages/LibraryPage';
 import { ReadingPage } from './pages/ReadingPage';
 import { ResultPage } from './pages/ResultPage';
+import { SettingsPage } from './pages/SettingsPage';
 import type { AppView, ReadingResult } from './types';
 
 export function App() {
@@ -49,6 +50,7 @@ export function App() {
       );
     }
     if (view === 'library') return <LibraryPage />;
+    if (view === 'settings') return <SettingsPage />;
     if (view === 'result' && activeReading) {
       return (
         <ResultPage

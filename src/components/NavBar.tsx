@@ -1,4 +1,4 @@
-import { BookOpen, History, Home, Sparkles } from 'lucide-react';
+import { BookOpen, History, Home, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { AppView } from '../types';
 
 interface NavBarProps {
@@ -12,6 +12,7 @@ export function NavBar({ activeView, onNavigate }: NavBarProps) {
     { view: 'reading', label: '占卜', icon: Sparkles },
     { view: 'history', label: '历史', icon: History },
     { view: 'library', label: '牌库', icon: BookOpen },
+    { view: 'settings', label: '配置', icon: SlidersHorizontal },
   ];
 
   return (
