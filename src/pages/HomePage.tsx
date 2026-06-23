@@ -28,9 +28,9 @@ export function HomePage({ latest, onNavigate, onOpenLatest }: HomePageProps) {
           </div>
         </div>
         <div className="hero-deck" aria-hidden="true">
-          <CardView card={tarotCards[2]} />
-          <CardView card={tarotCards[17]} />
-          <CardView card={tarotCards[10]} />
+          <CardView card={tarotCards[2]} loading="eager" />
+          <CardView card={tarotCards[17]} loading="eager" />
+          <CardView card={tarotCards[10]} loading="eager" />
         </div>
       </section>
 

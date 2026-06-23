@@ -60,6 +60,7 @@ export interface TarotCard {
   name: string;
   enName: string;
   image: string;
+  thumbnail: string;
   keywords: string[];
   upright: string;
   reversed: string;
