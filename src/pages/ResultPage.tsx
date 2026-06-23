@@ -11,9 +11,34 @@ interface ResultPageProps {
   reading: ReadingResult;
   onRestart: () => void;
   onLibrary: () => void;
+  onReadingUpdated: (reading: ReadingResult) => void;
 }
 
-export function ResultPage({ reading, onRestart, onLibrary }: ResultPageProps) {
+const llmAnalysisRequests = new Map<string, Promise<LlmAnalysis>>();
+const llmFailedAttempts = new Set<string>();
+
+const getLlmAttemptKey = (reading: ReadingResult) => {
+  const config = loadLlmConfig();
+  return [
+    reading.id,
+    config.provider,
+    config.baseUrl,
+    config.model,
+  ].join('|');
+};
+
+const getLlmAnalysisRequest = (reading: ReadingResult) => {
+  const attemptKey = getLlmAttemptKey(reading);
+  const existing = llmAnalysisRequests.get(attemptKey);
+  if (existing) return existing;
+  const request = generateLlmAnalysis(reading, loadLlmConfig()).finally(() => {
+    llmAnalysisRequests.delete(attemptKey);
+  });
+  llmAnalysisRequests.set(attemptKey, request);
+  return request;
+};
+
+export function ResultPage({ reading, onRestart, onLibrary, onReadingUpdated }: ResultPageProps) {
   const topic = getTopic(reading.input.topicId);
   const category = getQuestionCategory(reading.input.categoryId);
   const [llmAnalysis, setLlmAnalysis] = useState<LlmAnalysis | undefined>(reading.llmAnalysis);
@@ -41,18 +66,30 @@ export function ResultPage({ reading, onRestart, onLibrary }: ResultPageProps) {
       };
     }
 
+    const attemptKey = getLlmAttemptKey(reading);
+    if (llmFailedAttempts.has(attemptKey)) {
+      setLlmStatus('fallback');
+      setLlmMessage('本次会话已尝试生成 LLM 解析但失败，避免重复请求。修改 LLM 配置后会重新尝试。');
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setLlmStatus('loading');
     setLlmMessage('正在生成 LLM 辅助解析...');
-    generateLlmAnalysis(reading, config)
+    getLlmAnalysisRequest(reading)
       .then((analysis) => {
         if (cancelled) return;
+        const updatedReading = { ...reading, llmAnalysis: analysis };
         setLlmAnalysis(analysis);
         setLlmStatus('ready');
         setLlmMessage(`LLM 辅助解析已生成：${analysis.model}`);
-        updateSavedReading({ ...reading, llmAnalysis: analysis });
+        updateSavedReading(updatedReading);
+        onReadingUpdated(updatedReading);
       })
       .catch((error: Error) => {
         if (cancelled) return;
+        llmFailedAttempts.add(attemptKey);
         setLlmStatus('fallback');
         setLlmMessage(error.message);
       });
@@ -60,7 +97,7 @@ export function ResultPage({ reading, onRestart, onLibrary }: ResultPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [reading]);
+  }, [onReadingUpdated, reading]);
 
   return (
     <main className="screen result-screen">

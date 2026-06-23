@@ -8,6 +8,8 @@ export type Orientation = 'upright' | 'reversed';
 
 export type AppView = 'home' | 'reading' | 'result' | 'history' | 'library' | 'settings';
 
+export type LlmProvider = 'openai_compatible' | 'deepseek' | 'mimo';
+
 export type ParamKey =
   | 'timeRange'
   | 'relationshipStage'
@@ -109,9 +111,11 @@ export interface LlmAnalysis {
 
 export interface LlmConfig {
   enabled: boolean;
-  endpoint: string;
+  provider: LlmProvider;
+  baseUrl: string;
   model: string;
   apiKey: string;
+  providerApiKeys: Partial<Record<LlmProvider, string>>;
   temperature: number;
   timeoutMs: number;
 }

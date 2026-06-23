@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { NavBar } from './components/NavBar';
 import { loadHistory } from './lib/reading';
 import { HistoryPage } from './pages/HistoryPage';
@@ -35,6 +35,11 @@ export function App() {
     openReading(reading);
   };
 
+  const updateReading = useCallback((reading: ReadingResult) => {
+    setActiveReading(reading);
+    setHistory(loadHistory());
+  }, []);
+
   const renderView = () => {
     if (view === 'reading') return <ReadingPage onComplete={completeReading} />;
     if (view === 'history') {
@@ -57,6 +62,7 @@ export function App() {
           reading={activeReading}
           onRestart={() => setView('reading')}
           onLibrary={() => setView('library')}
+          onReadingUpdated={updateReading}
         />
       );
     }

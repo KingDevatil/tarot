@@ -1,4 +1,5 @@
 import { getQuestionCategory, getTopic } from '../data/questions';
+import { normalizeBaseUrl } from './llmConfig';
 import { getCardMeaning } from './reading';
 import type { DrawnCard, LlmAnalysis, LlmCardInterpretation, LlmConfig, ReadingResult } from '../types';
 
@@ -27,8 +28,9 @@ export const generateLlmAnalysis = async (
   reading: ReadingResult,
   config: LlmConfig,
 ): Promise<LlmAnalysis> => {
-  const content = await requestLlmContent(config, {
+  const result = await requestLlmContent(config, {
     temperature: config.temperature,
+    maxTokens: 2048,
     messages: [
       {
         role: 'system',
@@ -41,30 +43,30 @@ export const generateLlmAnalysis = async (
     ],
   });
 
-  return normalizeLlmAnalysis(parseLlmJson(content), reading, config.model.trim());
+  return normalizeLlmAnalysis(parseLlmJson(result.content), reading, config.model.trim());
 };
 
 export const testLlmConnection = async (config: LlmConfig): Promise<LlmConnectionTestResult> => {
-  if (!config.endpoint.trim() || !config.model.trim() || !config.apiKey.trim()) {
-    throw new LlmAnalysisError('请先填写接口地址、模型和 API Key');
+  if (!config.baseUrl.trim() || !config.model.trim() || !config.apiKey.trim()) {
+    throw new LlmAnalysisError('请先填写 Base URL、模型和 API Key');
   }
 
-  const content = await requestLlmContent(config, {
+  const result = await requestLlmContent(config, {
     temperature: 0,
-    maxTokens: 80,
+    maxTokens: 2048,
     messages: [
       {
         role: 'system',
-        content: '你只返回 JSON 对象，不要输出 Markdown 或额外解释。',
+        content: '你只返回 JSON 对象，不要输出 Markdown、翻译、解释、推理过程或额外文字。',
       },
       {
         role: 'user',
-        content: '请返回 {"ok": true, "message": "connected"} 用于连接测试。',
+        content: '直接原样返回这个 JSON 对象：{"ok":true,"message":"connected"}',
       },
     ],
   });
 
-  const parsed = parseLlmJson(content) as { ok?: unknown; message?: unknown };
+  const parsed = parseLlmJson(result.content) as { ok?: unknown; message?: unknown };
   if (parsed.ok !== true) {
     throw new LlmAnalysisError('连接成功，但测试 JSON 字段不符合预期，请检查模型输出格式');
   }
@@ -72,7 +74,7 @@ export const testLlmConnection = async (config: LlmConfig): Promise<LlmConnectio
   return {
     message: '连接成功，模型返回 JSON 格式正常。',
     model: config.model.trim(),
-    rawPreview: content.trim().slice(0, 160),
+    rawPreview: result.content.trim().slice(0, 160),
   };
 };
 
@@ -83,7 +85,7 @@ const requestLlmContent = async (
     temperature: number;
     maxTokens?: number;
   },
-) => {
+): Promise<{ content: string; finishReason: string }> => {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), config.timeoutMs);
 
@@ -93,14 +95,17 @@ const requestLlmContent = async (
       temperature: request.temperature,
       messages: request.messages,
     };
-    if (request.maxTokens) body.max_tokens = request.maxTokens;
+    if (request.maxTokens) {
+      if (config.provider === 'mimo') {
+        body.max_completion_tokens = request.maxTokens;
+      } else {
+        body.max_tokens = request.maxTokens;
+      }
+    }
 
-    const response = await fetch(config.endpoint.trim(), {
+    const response = await fetch(buildChatCompletionsUrl(config.baseUrl), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey.trim()}`,
-      },
+      headers: buildHeaders(config),
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -109,18 +114,23 @@ const requestLlmContent = async (
       throw new LlmAnalysisError(`LLM 请求失败：HTTP ${response.status}`);
     }
 
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = payload.choices?.[0]?.message?.content;
+    const payload = await response.json();
+    const content = extractLlmContent(payload);
     if (!content) {
-      throw new LlmAnalysisError('LLM 响应中没有可解析内容');
+      const finishReason = getFinishReason(payload);
+      if (finishReason === 'length') {
+        throw new LlmAnalysisError(`LLM 已连接成功，但模型把输出额度耗在推理过程里，最终正文为空。请重试，或换用非深度思考模型。响应预览：${previewPayload(payload)}`);
+      }
+      throw new LlmAnalysisError(`LLM 响应中没有可解析内容，请确认 Base URL、模型名称和鉴权方式。响应预览：${previewPayload(payload)}`);
     }
 
-    return content;
+    return {
+      content,
+      finishReason: getFinishReason(payload),
+    };
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new LlmAnalysisError('LLM 请求超时，已回退到本地解析');
+      throw new LlmAnalysisError(`LLM 请求超过 ${Math.round(config.timeoutMs / 1000)} 秒未返回，已回退到本地解析`);
     }
     if (error instanceof LlmAnalysisError) {
       throw error;
@@ -129,6 +139,72 @@ const requestLlmContent = async (
   } finally {
     window.clearTimeout(timeout);
   }
+};
+
+const buildChatCompletionsUrl = (baseUrl: string) => `${normalizeBaseUrl(baseUrl)}/chat/completions`;
+
+const buildHeaders = (config: LlmConfig) => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (config.provider === 'mimo') {
+    headers['api-key'] = config.apiKey.trim();
+  } else {
+    headers.Authorization = `Bearer ${config.apiKey.trim()}`;
+  }
+  return headers;
+};
+
+const getFinishReason = (payload: unknown) => {
+  if (!payload || typeof payload !== 'object') return '';
+  const data = payload as { choices?: Array<{ finish_reason?: unknown }> };
+  const reason = data.choices?.[0]?.finish_reason;
+  return typeof reason === 'string' ? reason : '';
+};
+
+const extractLlmContent = (payload: unknown): string => {
+  if (!payload || typeof payload !== 'object') return '';
+  const data = payload as {
+    choices?: Array<{
+      message?: { content?: unknown; reasoning_content?: unknown };
+      delta?: { content?: unknown };
+      text?: unknown;
+    }>;
+    output_text?: unknown;
+    output?: unknown;
+  };
+
+  const choice = data.choices?.[0];
+  return normalizeContentPart(choice?.message?.content)
+    || normalizeContentPart(choice?.text)
+    || normalizeContentPart(choice?.delta?.content)
+    || normalizeContentPart(data.output_text)
+    || normalizeContentPart(data.output);
+};
+
+const previewPayload = (payload: unknown) => {
+  try {
+    return JSON.stringify(payload).slice(0, 240);
+  } catch {
+    return String(payload).slice(0, 240);
+  }
+};
+
+const normalizeContentPart = (value: unknown): string => {
+  if (typeof value === 'string') return value.trim();
+  if (!Array.isArray(value)) return '';
+  return value
+    .map((part) => {
+      if (typeof part === 'string') return part;
+      if (!part || typeof part !== 'object') return '';
+      const item = part as { text?: unknown; content?: unknown; type?: unknown };
+      if (typeof item.text === 'string') return item.text;
+      if (typeof item.content === 'string') return item.content;
+      if (Array.isArray(item.content)) return normalizeContentPart(item.content);
+      return '';
+    })
+    .join('')
+    .trim();
 };
 
 const buildSystemPrompt = () => `

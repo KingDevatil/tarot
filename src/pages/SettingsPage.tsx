@@ -1,8 +1,14 @@
 import { Save, SlidersHorizontal, TestTube2 } from 'lucide-react';
 import { useState } from 'react';
 import { testLlmConnection } from '../lib/llmAnalysis';
-import { defaultLlmConfig, loadLlmConfig, saveLlmConfig } from '../lib/llmConfig';
-import type { LlmConfig } from '../types';
+import {
+  applyLlmProviderPreset,
+  defaultLlmConfig,
+  llmProviderPresets,
+  loadLlmConfig,
+  saveLlmConfig,
+} from '../lib/llmConfig';
+import type { LlmConfig, LlmProvider } from '../types';
 
 type TestState =
   | { status: 'idle'; message: string }
@@ -15,7 +21,7 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [testState, setTestState] = useState<TestState>({
     status: 'idle',
-    message: '填写接口地址、模型和 API Key 后，可以先测试连接。',
+    message: '填写 Base URL、模型和 API Key 后，可以先测试连接。',
   });
 
   const update = <K extends keyof LlmConfig>(key: K, value: LlmConfig[K]) => {
@@ -24,7 +30,28 @@ export function SettingsPage() {
       status: 'idle',
       message: '配置已修改，建议重新测试连接。',
     });
-    setConfig((current) => ({ ...current, [key]: value }));
+    setConfig((current) => {
+      const next = { ...current, [key]: value };
+      if (key === 'apiKey') {
+        return {
+          ...next,
+          providerApiKeys: {
+            ...current.providerApiKeys,
+            [current.provider]: value as string,
+          },
+        };
+      }
+      return next;
+    });
+  };
+
+  const changeProvider = (provider: LlmProvider) => {
+    setSaved(false);
+    setTestState({
+      status: 'idle',
+      message: '服务商已切换，已填入推荐 Base URL 和模型，建议重新测试连接。',
+    });
+    setConfig((current) => applyLlmProviderPreset(current, provider));
   };
 
   const save = () => {
@@ -38,7 +65,7 @@ export function SettingsPage() {
     setSaved(true);
     setTestState({
       status: 'idle',
-      message: '已恢复默认配置。填写接口地址、模型和 API Key 后，可以先测试连接。',
+      message: '已恢复默认配置。填写 Base URL、模型和 API Key 后，可以先测试连接。',
     });
   };
 
@@ -59,8 +86,9 @@ export function SettingsPage() {
     }
   };
 
-  const canTest = Boolean(config.endpoint.trim() && config.model.trim() && config.apiKey.trim());
+  const canTest = Boolean(config.baseUrl.trim() && config.model.trim() && config.apiKey.trim());
   const isTesting = testState.status === 'testing';
+  const providerPreset = llmProviderPresets[config.provider];
 
   return (
     <main className="screen settings-screen">
@@ -91,11 +119,23 @@ export function SettingsPage() {
 
         <div className="settings-grid">
           <label className="settings-field">
-            <span>接口地址</span>
+            <span>服务商</span>
+            <select
+              value={config.provider}
+              onChange={(event) => changeProvider(event.target.value as LlmProvider)}
+            >
+              {(Object.entries(llmProviderPresets) as Array<[LlmProvider, typeof providerPreset]>).map(([provider, preset]) => (
+                <option key={provider} value={provider}>{preset.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="settings-field">
+            <span>Base URL</span>
             <input
-              value={config.endpoint}
-              placeholder="https://api.openai.com/v1/chat/completions"
-              onChange={(event) => update('endpoint', event.target.value)}
+              value={config.baseUrl}
+              placeholder="https://api.openai.com/v1"
+              onChange={(event) => update('baseUrl', event.target.value)}
             />
           </label>
 
@@ -151,9 +191,14 @@ export function SettingsPage() {
         </div>
 
         <div className="settings-note">
+          <strong>{providerPreset.label}</strong>
+          <p>{providerPreset.note}</p>
+        </div>
+
+        <div className="settings-note">
           <strong>前端直连限制</strong>
           <p>
-            API Key 会保存在本机浏览器。部分 LLM 服务不允许浏览器跨域直连，这种情况下请求会失败并回退本地解析。
+            API Key 会按服务商分别保存在本机浏览器，切换服务商时会自动带出对应 Key。Base URL 只填写兼容协议根路径，程序会自动拼接 /chat/completions。部分 LLM 服务不允许浏览器跨域直连，这种情况下请求会失败并回退本地解析。
           </p>
         </div>
 

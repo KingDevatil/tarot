@@ -838,7 +838,8 @@ button.tarot-card {
   font-weight: 760;
 }
 
-.settings-field input {
+.settings-field input,
+.settings-field select {
   width: 100%;
   min-height: 42px;
   padding: 0 12px;
@@ -846,6 +847,21 @@ button.tarot-card {
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.18);
   color: var(--text);
+}
+
+.settings-field select {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.settings-field select option {
+  background: #1f1d24;
+  color: var(--text);
+}
+
+.settings-field select option:checked {
+  background: #3a3327;
+  color: var(--accent-strong);
 }
 
 .settings-field input[type='range'] {
