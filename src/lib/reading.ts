@@ -25,6 +25,8 @@ const orientationLabel = (orientation: DrawnCard['orientation']) =>
 export const getCardMeaning = (drawn: DrawnCard) =>
   drawn.orientation === 'upright' ? drawn.card.upright : drawn.card.reversed;
 
+export type DrawCandidate = Pick<DrawnCard, 'card' | 'orientation'>;
+
 const buildSummary = (cards: DrawnCard[], focus: string[]) => {
   if (cards.length === 1) {
     const drawn = cards[0];
@@ -49,13 +51,29 @@ const buildSummary = (cards: DrawnCard[], focus: string[]) => {
 export const createReading = (input: ReadingInput): ReadingResult => {
   const category = getQuestionCategory(input.categoryId);
   const spread = getSpread(category.defaultSpread);
-  const cards = shuffle<TarotCard>(tarotCards)
-    .slice(0, spread.positions.length)
-    .map<DrawnCard>((card, index) => ({
+  const draws = createDrawDeck(spread.positions.length);
+
+  return createReadingFromDraws(input, draws);
+};
+
+export const createDrawDeck = (count = 12): DrawCandidate[] =>
+  shuffle<TarotCard>(tarotCards)
+    .slice(0, count)
+    .map((card) => ({
       card,
-      position: spread.positions[index],
       orientation: Math.random() > 0.5 ? 'upright' : 'reversed',
     }));
+
+export const createReadingFromDraws = (
+  input: ReadingInput,
+  draws: DrawCandidate[],
+): ReadingResult => {
+  const category = getQuestionCategory(input.categoryId);
+  const spread = getSpread(category.defaultSpread);
+  const cards = draws.slice(0, spread.positions.length).map<DrawnCard>((draw, index) => ({
+    ...draw,
+    position: spread.positions[index],
+  }));
 
   const question = buildQuestion(category.questionTemplate, input.params);
   const summary = buildSummary(cards, category.interpretationFocus);

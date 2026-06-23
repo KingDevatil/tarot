@@ -195,8 +195,12 @@ button {
   border-radius: 8px;
   background: #1a1614;
   overflow: hidden;
-  cursor: pointer;
+  cursor: default;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+}
+
+button.tarot-card {
+  cursor: pointer;
 }
 
 .tarot-card img {
@@ -204,6 +208,10 @@ button {
   height: 100%;
   object-fit: cover;
   transition: transform 240ms ease;
+}
+
+.tarot-card__back-image {
+  display: block;
 }
 
 .tarot-card:hover img {
@@ -228,30 +236,58 @@ button {
 
 .tarot-card__meta {
   position: absolute;
-  left: 14px;
-  right: 14px;
+  left: 50%;
   bottom: 14px;
   z-index: 3;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 10px;
+  justify-content: center;
+  width: fit-content;
+  min-width: min(74px, calc(100% - 28px));
+  max-width: calc(100% - 28px);
+  height: 34px;
+  padding: 0 12px;
   border-radius: 6px;
   background: rgba(10, 10, 12, 0.68);
   color: var(--text);
+  transform: translateX(-50%);
   backdrop-filter: blur(10px);
 }
 
 .tarot-card__meta strong {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
   font-size: clamp(12px, 1.8vw, 15px);
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tarot-card__meta em {
+.tarot-card__orientation {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(244, 213, 141, 0.74);
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.68);
   color: var(--accent-strong);
-  font-style: normal;
-  font-size: 12px;
-  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.tarot-card__orientation.is-reversed {
+  border-color: rgba(146, 177, 255, 0.72);
+  color: #cdd9ff;
 }
 
 .tarot-card__back {
@@ -416,10 +452,29 @@ button {
 }
 
 .ritual-panel {
+  position: relative;
   min-height: 620px;
   display: grid;
   align-content: center;
   gap: 28px;
+}
+
+.ritual-back-button {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
 }
 
 .ritual-copy {
@@ -437,6 +492,30 @@ button {
   gap: 18px;
 }
 
+.shuffle-deck {
+  min-height: 300px;
+  align-items: center;
+}
+
+.shuffle-card-button {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.shuffle-card-button .tarot-card {
+  pointer-events: none;
+}
+
+.shuffle-card-button:hover .tarot-card {
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(244, 213, 141, 0.35);
+}
+
 .ritual-panel.is-shuffle .tarot-card {
   animation: shuffle-card 1.1s ease-in-out infinite alternate;
 }
@@ -451,6 +530,138 @@ button {
 
 .ritual-actions {
   justify-content: center;
+}
+
+.cut-deck {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 170px));
+  justify-content: center;
+  gap: 18px;
+}
+
+.cut-pile,
+.draw-slot {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cut-pile {
+  padding: 12px;
+}
+
+.cut-pile:hover,
+.draw-slot:hover:not(:disabled) {
+  border-color: rgba(244, 213, 141, 0.42);
+  background: rgba(244, 213, 141, 0.08);
+}
+
+.cut-pile .tarot-card,
+.draw-slot .tarot-card {
+  pointer-events: none;
+}
+
+.cut-pile span,
+.draw-slot span {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.manual-draw-area {
+  display: grid;
+  gap: 18px;
+}
+
+.draw-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 128px));
+  justify-content: center;
+  gap: 12px;
+}
+
+.draw-slot {
+  min-width: 0;
+  padding: 8px;
+}
+
+.draw-slot:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.draw-slot.is-picked {
+  border-color: rgba(244, 213, 141, 0.38);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.draw-slot.is-picked .tarot-card {
+  animation: reveal-card 440ms ease both;
+}
+
+.draw-complete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: start center;
+  padding: 86px 18px 112px;
+  background: rgba(5, 5, 8, 0.64);
+  backdrop-filter: blur(10px);
+}
+
+.draw-complete-panel {
+  width: min(820px, 100%);
+  max-height: min(620px, calc(100vh - 220px));
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(41, 40, 48, 0.98), rgba(18, 18, 24, 0.98)),
+    var(--bg-soft);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
+}
+
+.draw-complete-copy {
+  text-align: center;
+}
+
+.draw-complete-copy span,
+.draw-complete-cards span {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.draw-complete-copy h2 {
+  margin: 6px 0 8px;
+  font-size: 28px;
+}
+
+.draw-complete-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.draw-complete-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 116px));
+  justify-content: center;
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.draw-complete-cards article {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
 }
 
 .result-summary {
@@ -551,9 +762,130 @@ button {
   gap: 16px;
 }
 
+.library-detail {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.5fr) minmax(0, 1.5fr);
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.library-detail span,
+.library-meanings strong {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.library-detail h2 {
+  margin: 8px 0 6px;
+  font-size: 28px;
+}
+
+.library-detail p,
+.library-meanings p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.library-meanings {
+  display: grid;
+  gap: 12px;
+}
+
+.library-meanings article {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
 .library-card {
   padding: 10px;
   border-radius: 8px;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.library-card.is-selected {
+  border-color: rgba(244, 213, 141, 0.68);
+  background: rgba(244, 213, 141, 0.1);
+}
+
+.library-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: end center;
+  padding: 18px;
+  background: rgba(5, 5, 8, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.library-detail-drawer {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: min(78vh, 680px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(41, 40, 48, 0.98), rgba(18, 18, 24, 0.98)),
+    var(--bg-soft);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
+}
+
+.library-detail-drawer > div:first-of-type {
+  padding-right: 48px;
+}
+
+.library-detail-drawer span {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.library-detail-drawer h2 {
+  margin: 8px 0 6px;
+  font-size: 30px;
+}
+
+.library-detail-drawer p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.detail-close-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.detail-close-button span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .library-card h2 {
@@ -589,8 +921,9 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  min-height: 52px;
+  height: 52px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -616,6 +949,17 @@ button {
   }
 }
 
+@keyframes reveal-card {
+  0% {
+    opacity: 0.4;
+    transform: rotateY(74deg) translateY(12px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: rotateY(0deg) translateY(0) scale(1);
+  }
+}
+
 @media (max-width: 860px) {
   .screen {
     width: min(100vw - 24px, 680px);
@@ -624,6 +968,7 @@ button {
 
   .hero-panel,
   .reading-layout,
+  .library-detail,
   .result-summary {
     grid-template-columns: 1fr;
   }
@@ -663,6 +1008,16 @@ button {
   .ritual-deck {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
     gap: 10px;
+  }
+
+  .cut-deck {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .draw-slots {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .drawn-card-row {
