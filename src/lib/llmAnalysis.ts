@@ -32,7 +32,7 @@ interface RawLlmAnalysis {
 
 const QUESTION_GENERATION_MAX_TOKENS = 4096;
 const ANALYSIS_MAX_TOKENS = 4096;
-export const LLM_ANALYSIS_VERSION = 2;
+export const LLM_ANALYSIS_VERSION = 3;
 const GENERIC_ANALYSIS_PHRASES = [
   '保持开放',
   '相信自己',
@@ -42,6 +42,26 @@ const GENERIC_ANALYSIS_PHRASES = [
   '谨慎观察',
   '多加留意',
   '一切皆有可能',
+];
+const ACTION_WORDS = [
+  '记录',
+  '比较',
+  '确认',
+  '询问',
+  '沟通',
+  '检查',
+  '核对',
+  '暂停',
+  '减少',
+  '增加',
+  '设定',
+  '观察',
+  '执行',
+  '联系',
+  '整理',
+  '等待',
+  '停止',
+  '避免',
 ];
 
 export interface LlmConnectionTestResult {
@@ -148,7 +168,7 @@ export const generateLlmAnalysis = async (
             JSON.stringify(buildReadingPayload(reading), null, 2),
             '',
             '上一次输出过于笼统，请重写。',
-            '必须直接回答具体问题，overview 第一段给出明确倾向；每张牌必须把牌位、正逆位牌义与问题中的具体对象建立因果联系；建议必须包含具体动作、时机或判断标准。',
+            '必须直接回答具体问题，overview 第一段给出明确倾向；每张牌必须把牌位、正逆位牌义与问题中的具体对象建立因果联系；必须输出至少 3 条 advice，每条包含具体动作以及时机、对象、停止条件或验证标准。',
           ].join('\n'),
         },
       ],
@@ -432,16 +452,26 @@ const isAnalysisSpecificEnough = (raw: RawLlmAnalysis, reading: ReadingResult) =
     );
   });
   const allText = [overview, ...cardTexts].join('\n');
+  const advice = normalizeStringArray(
+    pickFirst(raw.advice, raw.suggestions, raw.actions),
+    [],
+  );
   const genericPhraseCount = GENERIC_ANALYSIS_PHRASES.filter((phrase) =>
-    allText.includes(phrase)).length;
+    `${allText}\n${advice.join('\n')}`.includes(phrase)).length;
   const hasQuestionAnchor = getQuestionAnchors(reading).some((anchor) =>
     allText.includes(anchor));
   const cardsAreSubstantial =
     cardTexts.length === reading.cards.length
     && cardTexts.every((text) => text.length >= 55);
+  const adviceIsActionable =
+    advice.length >= 3
+    && advice.every((item) =>
+      item.length >= 18
+      && ACTION_WORDS.some((word) => item.includes(word)));
 
   return overview.length >= 80
     && cardsAreSubstantial
+    && adviceIsActionable
     && hasQuestionAnchor
     && genericPhraseCount < 2;
 };

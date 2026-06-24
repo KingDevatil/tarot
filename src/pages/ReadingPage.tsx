@@ -18,10 +18,11 @@ interface ReadingPageProps {
   onComplete: (reading: ReadingResult) => void;
 }
 
-type RitualStage = 'select' | 'shuffle' | 'cut' | 'draw';
+type RitualStage = 'select' | 'focus' | 'shuffle' | 'cut' | 'draw' | 'reveal';
 
-const SHUFFLE_TRANSITION_MS = 900;
-const CUT_TRANSITION_MS = 760;
+const SHUFFLE_ROUNDS = 3;
+const SHUFFLE_TRANSITION_MS = 680;
+const CUT_TRANSITION_MS = 620;
 const CARD_REVEAL_MS = 720;
 
 export function ReadingPage({ onComplete }: ReadingPageProps) {
@@ -37,8 +38,9 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   const [drawnCards, setDrawnCards] = useState<DrawnCard[]>([]);
   const [isDrawCompleteOpen, setIsDrawCompleteOpen] = useState(false);
   const [selectedShuffleCard, setSelectedShuffleCard] = useState<number | null>(null);
-  const [selectedCutPile, setSelectedCutPile] = useState<number | null>(null);
-  const [revealingSlot, setRevealingSlot] = useState<number | null>(null);
+  const [shuffleRound, setShuffleRound] = useState(0);
+  const [cutOrder, setCutOrder] = useState<number[]>([]);
+  const [revealedCount, setRevealedCount] = useState(0);
   const transitionTimers = useRef<number[]>([]);
   const [llmConfig] = useState(() => loadLlmConfig());
   const [customContexts, setCustomContexts] = useState<Record<string, string>>({});
@@ -77,8 +79,9 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
     transitionTimers.current = [];
     setSelectedShuffleCard(null);
-    setSelectedCutPile(null);
-    setRevealingSlot(null);
+    setShuffleRound(0);
+    setCutOrder([]);
+    setRevealedCount(0);
   };
 
   const setTopic = (nextTopicId: TopicId) => {
@@ -160,6 +163,15 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     }
   };
 
+  const startRitual = () => {
+    resetRitualAnimation();
+    setReading(null);
+    setPickedSlots([]);
+    setDrawnCards([]);
+    setIsDrawCompleteOpen(false);
+    setStage('focus');
+  };
+
   const startShuffle = () => {
     resetRitualAnimation();
     setReading(null);
@@ -167,6 +179,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     setDrawnCards([]);
     setIsDrawCompleteOpen(false);
     setDrawDeck(createDrawDeck(12));
+    setShuffleRound(0);
     setStage('shuffle');
   };
 
@@ -175,15 +188,21 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     setSelectedShuffleCard(index);
     scheduleTransition(() => {
       setSelectedShuffleCard(null);
-      setStage('cut');
+      const nextRound = shuffleRound + 1;
+      setShuffleRound(nextRound);
+      if (nextRound >= SHUFFLE_ROUNDS) {
+        setCutOrder([]);
+        setStage('cut');
+      }
     }, SHUFFLE_TRANSITION_MS);
   };
 
   const selectCutPile = (index: number) => {
-    if (selectedCutPile !== null) return;
-    setSelectedCutPile(index);
+    if (cutOrder.includes(index)) return;
+    const nextOrder = [...cutOrder, index];
+    setCutOrder(nextOrder);
+    if (nextOrder.length < 3) return;
     scheduleTransition(() => {
-      setSelectedCutPile(null);
       setPickedSlots([]);
       setIsDrawCompleteOpen(false);
       setStage('draw');
@@ -196,7 +215,6 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   };
 
   const pickCard = (slotIndex: number) => {
-    if (revealingSlot !== null) return;
     if (pickedSlots.includes(slotIndex)) return;
     if (drawnCards.length >= currentSpread.positions.length) return;
 
@@ -210,7 +228,6 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
         position: currentSpread.positions[drawnCards.length],
       },
     ];
-    setRevealingSlot(slotIndex);
     setDrawnCards(nextDrawnCards);
     setPickedSlots((current) => [...current, slotIndex]);
 
@@ -229,12 +246,20 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
       );
     }
 
-    scheduleTransition(() => {
-      setRevealingSlot(null);
-      if (nextDrawnCards.length === currentSpread.positions.length) {
-        setIsDrawCompleteOpen(true);
-      }
-    }, CARD_REVEAL_MS);
+  };
+
+  const startReveal = () => {
+    if (!reading || drawnCards.length !== currentSpread.positions.length) return;
+    setRevealedCount(0);
+    setStage('reveal');
+    reading.cards.forEach((_, index) => {
+      scheduleTransition(() => {
+        setRevealedCount(index + 1);
+        if (index === reading.cards.length - 1) {
+          scheduleTransition(() => setIsDrawCompleteOpen(true), CARD_REVEAL_MS);
+        }
+      }, CARD_REVEAL_MS * (index + 1));
+    });
   };
 
   const finishReading = () => {
@@ -375,10 +400,10 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
               className="primary-button full-width"
               type="button"
               disabled={!canStartShuffle}
-              onClick={startShuffle}
+              onClick={startRitual}
             >
               <Shuffle size={18} />
-              开始洗牌
+              确认问题，开始仪式
             </button>
           </section>
         </div>
@@ -387,7 +412,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
           <button
             className="ritual-back-button"
             type="button"
-            disabled={selectedShuffleCard !== null || selectedCutPile !== null || revealingSlot !== null}
+            disabled={selectedShuffleCard !== null || stage === 'reveal'}
             onClick={returnToQuestion}
           >
             <ChevronLeft size={18} />
@@ -396,37 +421,70 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
 
           <div className="ritual-copy">
             <h2>{ritualTitle(stage, currentSpread.name)}</h2>
-            <p>{ritualDescription(stage, question, currentSpread.positions.length, drawnCards.length)}</p>
+            <p>{ritualDescription(
+              stage,
+              question,
+              currentSpread.positions.length,
+              drawnCards.length,
+              shuffleRound,
+              cutOrder.length,
+              revealedCount,
+            )}</p>
           </div>
 
-          {stage === 'shuffle' ? (
-            <div className={`ritual-deck shuffle-deck ${selectedShuffleCard !== null ? 'is-resolving' : ''}`}>
-              {Array.from({ length: 7 }).map((_, index) => (
-                <button
-                  className={`shuffle-card-button ${selectedShuffleCard === index ? 'is-chosen' : ''}`}
-                  type="button"
-                  key={index}
-                  disabled={selectedShuffleCard !== null}
-                  onClick={() => selectShuffleCard(index)}
-                >
-                  <CardView isBack isSelected={index === 3} />
-                </button>
-              ))}
+          {stage === 'focus' ? (
+            <div className="focus-ritual">
+              <span className="focus-ritual__symbol" aria-hidden="true">✦</span>
+              <p>{question}</p>
+              <ol>
+                <li>确认本次只围绕这一个问题抽牌</li>
+                <li>安静呼吸，将注意力放在问题的具体对象上</li>
+                <li>准备好后再开始洗牌</li>
+              </ol>
+              <button className="primary-button" type="button" onClick={startShuffle}>
+                我已专注问题，开始洗牌
+              </button>
             </div>
           ) : null}
 
+          {stage === 'shuffle' ? (
+            <>
+              <div className="ritual-progress" aria-label={`洗牌进度 ${shuffleRound} / ${SHUFFLE_ROUNDS}`}>
+                {Array.from({ length: SHUFFLE_ROUNDS }).map((_, index) => (
+                  <span className={index < shuffleRound ? 'is-complete' : ''} key={index} />
+                ))}
+              </div>
+              <div className={`ritual-deck shuffle-deck ${selectedShuffleCard !== null ? 'is-resolving' : ''}`}>
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <button
+                    className={`shuffle-card-button ${selectedShuffleCard === index ? 'is-chosen' : ''}`}
+                    type="button"
+                    key={index}
+                    disabled={selectedShuffleCard !== null}
+                    onClick={() => selectShuffleCard(index)}
+                  >
+                    <CardView isBack isSelected={index === 3} />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+
           {stage === 'cut' ? (
-            <div className={`cut-deck ${selectedCutPile !== null ? 'is-resolving' : ''}`}>
+            <div className={`cut-deck ${cutOrder.length === 3 ? 'is-resolving' : ''}`}>
               {Array.from({ length: 3 }).map((_, index) => (
                 <button
-                  className={`cut-pile ${selectedCutPile === index ? 'is-chosen' : ''}`}
+                  className={`cut-pile ${cutOrder.includes(index) ? 'is-chosen' : ''}`}
                   type="button"
                   key={index}
-                  disabled={selectedCutPile !== null}
+                  disabled={cutOrder.includes(index) || cutOrder.length === 3}
                   onClick={() => selectCutPile(index)}
                 >
                   <CardView isBack />
                   <span>{['左手牌堆', '中间牌堆', '右手牌堆'][index]}</span>
+                  {cutOrder.includes(index) ? (
+                    <strong className="cut-order">{cutOrder.indexOf(index) + 1}</strong>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -444,19 +502,39 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
                       className={`draw-slot ${drawn ? 'is-picked' : ''}`}
                       type="button"
                       key={index}
-                      disabled={disabled || revealingSlot !== null}
+                      disabled={disabled || Boolean(drawn)}
                       onClick={() => pickCard(index)}
                     >
-                      <CardView isBack={!drawn} drawn={drawn} />
+                      <CardView isBack drawn={drawn} />
                       <span>{drawn?.position.label ?? '点击抽取'}</span>
                     </button>
                   );
                 })}
               </div>
+              {reading ? (
+                <button className="primary-button reveal-button" type="button" onClick={startReveal}>
+                  <Sparkles size={18} />
+                  按牌位顺序翻牌
+                </button>
+              ) : null}
             </div>
           ) : null}
 
-          {stage === 'draw' && reading && isDrawCompleteOpen ? (
+          {stage === 'reveal' && reading ? (
+            <div className="reveal-spread">
+              {reading.cards.map((drawn, index) => {
+                const isRevealed = index < revealedCount;
+                return (
+                  <article className={`reveal-position ${isRevealed ? 'is-revealed' : ''}`} key={drawn.position.id}>
+                    <CardView isBack={!isRevealed} drawn={drawn} />
+                    <span>{drawn.position.label}</span>
+                  </article>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {stage === 'reveal' && reading && isDrawCompleteOpen ? (
             <div className="draw-complete-overlay" role="dialog" aria-modal="true" aria-label="抽牌完成">
               <section className="draw-complete-panel">
                 <div className="draw-complete-copy">
@@ -492,21 +570,35 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
 }
 
 function ritualTitle(stage: RitualStage, spreadName: string) {
+  if (stage === 'focus') return '静心确认问题';
   if (stage === 'shuffle') return '手动洗牌';
-  if (stage === 'cut') return '选择切牌牌堆';
+  if (stage === 'cut') return '三叠切牌';
+  if (stage === 'reveal') return '依次翻牌';
   return spreadName;
 }
 
-function ritualDescription(stage: RitualStage, question: string, totalCards: number, pickedCount: number) {
-  if (stage === 'shuffle') return '保持当前问题，点击任意牌背完成洗牌并进入切牌。';
-  if (stage === 'cut') return '选择一个牌堆作为本次占卜的切入点。';
+function ritualDescription(
+  stage: RitualStage,
+  question: string,
+  totalCards: number,
+  pickedCount: number,
+  shuffleRound: number,
+  cutCount: number,
+  revealedCount: number,
+) {
+  if (stage === 'focus') return '先确认问题，再进入洗牌、切牌、抽牌和翻牌。';
+  if (stage === 'shuffle') return `保持专注，完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} / ${SHUFFLE_ROUNDS} 次洗牌。`;
+  if (stage === 'cut') return `按你希望重新合牌的顺序选择三叠牌。已选择 ${cutCount} / 3。`;
+  if (stage === 'reveal') return `按照牌阵位置依次翻开。已翻开 ${revealedCount} / ${totalCards} 张。`;
   return `${question} 已抽取 ${pickedCount} / ${totalCards} 张。`;
 }
 
 function pageTitle(stage: RitualStage) {
   if (stage === 'select') return '选择占卜类别';
+  if (stage === 'focus') return '确认问题';
   if (stage === 'shuffle') return '洗牌';
   if (stage === 'cut') return '切牌';
+  if (stage === 'reveal') return '翻牌';
   return '抽牌';
 }
 
@@ -516,9 +608,11 @@ function pageDescription(stage: RitualStage, llmEnabled: boolean) {
       ? '选择类别和参数后，可以补充具体情况，由 LLM 整理为清晰的占卜问题。'
       : '问题由类别和参数生成；开启 LLM 后，可以补充具体情况并生成定制问题。';
   }
+  if (stage === 'focus') return '静心确认本次占卜只回应一个明确问题。';
   if (stage === 'shuffle') return '由玩家手动确认洗牌完成，系统不会自动跳过仪式步骤。';
-  if (stage === 'cut') return '从三组牌堆中选择一个，作为本次占卜的切入点。';
-  return '从牌背中手动抽取需要的牌，抽满后再查看解析。';
+  if (stage === 'cut') return '将牌分为三叠，并按选择顺序重新合牌。';
+  if (stage === 'reveal') return '全部选牌完成后，按牌位顺序统一揭示牌面。';
+  return '从牌背中选出牌阵需要的牌；选牌阶段不提前查看牌面。';
 }
 
 function paramLabel(paramKey: ParamKey) {

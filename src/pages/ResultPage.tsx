@@ -174,9 +174,11 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
 
       <section className="advice-panel">
         <h2>行动建议</h2>
-        {(llmAnalysis?.advice ?? reading.advice.split('\n')).map((line) => (
-          <p key={line}>{line}</p>
-        ))}
+        <ol className="advice-list">
+          {(llmAnalysis?.advice ?? reading.advice.split('\n')).map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ol>
         {llmAnalysis ? (
           <div className="llm-extra">
             <article>

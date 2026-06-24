@@ -39,7 +39,7 @@ export function CardView({
       }`}
       {...(onClick ? { type: 'button' } : {})}
       onClick={onClick}
-      aria-label={activeCard ? `${activeCard.name} ${orientation ?? ''}` : '塔罗牌'}
+      aria-label={!isBack && activeCard ? `${activeCard.name} ${orientation ?? ''}` : '塔罗牌'}
     >
       <span className="tarot-card__frame" />
       {isBack || !activeCard ? (
