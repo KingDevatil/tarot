@@ -102,6 +102,7 @@ export interface LlmCardInterpretation {
 }
 
 export interface LlmAnalysis {
+  version?: number;
   overview: string;
   cards: LlmCardInterpretation[];
   advice: string[];

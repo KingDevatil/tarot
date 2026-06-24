@@ -499,6 +499,17 @@ button.tarot-card {
   background: rgba(0, 0, 0, 0.22);
 }
 
+.entertainment-notice {
+  margin: -10px 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.result-notice {
+  margin: -6px 2px 14px;
+}
+
 .ritual-panel {
   position: relative;
   min-height: 620px;
@@ -993,26 +1004,30 @@ button.tarot-card {
   accent-color: var(--accent);
 }
 
-.settings-note {
-  margin-top: 16px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.16);
-}
-
-.settings-note strong {
-  color: var(--accent-strong);
-}
-
-.settings-note p {
-  margin: 6px 0 0;
-}
-
 .settings-saved {
   align-self: center;
   color: var(--accent-strong);
   font-weight: 760;
+}
+
+.disclaimer-panel {
+  max-width: 860px;
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid rgba(244, 213, 141, 0.22);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.disclaimer-panel .panel-title {
+  margin-bottom: 12px;
+}
+
+.disclaimer-panel p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .settings-test-result {

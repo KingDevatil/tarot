@@ -2,7 +2,7 @@ import { ArrowLeft, RotateCcw, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CardView } from '../components/CardView';
 import { getQuestionCategory, getTopic } from '../data/questions';
-import { generateLlmAnalysis } from '../lib/llmAnalysis';
+import { generateLlmAnalysis, LLM_ANALYSIS_VERSION } from '../lib/llmAnalysis';
 import { isLlmConfigUsable, loadLlmConfig } from '../lib/llmConfig';
 import { getCardMeaning, updateSavedReading } from '../lib/reading';
 import type { LlmAnalysis, ReadingResult } from '../types';
@@ -41,7 +41,11 @@ const getLlmAnalysisRequest = (reading: ReadingResult) => {
 export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageProps) {
   const topic = getTopic(reading.input.topicId);
   const category = getQuestionCategory(reading.input.categoryId);
-  const [llmAnalysis, setLlmAnalysis] = useState<LlmAnalysis | undefined>(reading.llmAnalysis);
+  const savedLlmAnalysis =
+    reading.llmAnalysis?.version === LLM_ANALYSIS_VERSION
+      ? reading.llmAnalysis
+      : undefined;
+  const [llmAnalysis, setLlmAnalysis] = useState<LlmAnalysis | undefined>(savedLlmAnalysis);
   const [llmStatus, setLlmStatus] = useState<'disabled' | 'loading' | 'ready' | 'fallback'>('disabled');
   const [llmMessage, setLlmMessage] = useState('');
   const [retryNonce, setRetryNonce] = useState(0);
@@ -49,7 +53,11 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
   useEffect(() => {
     let cancelled = false;
     const config = loadLlmConfig();
-    setLlmAnalysis(reading.llmAnalysis);
+    const currentSavedAnalysis =
+      reading.llmAnalysis?.version === LLM_ANALYSIS_VERSION
+        ? reading.llmAnalysis
+        : undefined;
+    setLlmAnalysis(currentSavedAnalysis);
 
     if (!isLlmConfigUsable(config)) {
       setLlmStatus('disabled');
@@ -59,9 +67,9 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
       };
     }
 
-    if (reading.llmAnalysis) {
+    if (currentSavedAnalysis) {
       setLlmStatus('ready');
-      setLlmMessage(`LLM 辅助解析已生成：${reading.llmAnalysis.model}`);
+      setLlmMessage(`LLM 辅助解析已生成：${currentSavedAnalysis.model}`);
       return () => {
         cancelled = true;
       };
@@ -108,7 +116,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
 
   const canRetryLlm =
     llmStatus === 'fallback'
-    && !reading.llmAnalysis
+    && !savedLlmAnalysis
     && isLlmConfigUsable(loadLlmConfig());
 
   return (
@@ -131,6 +139,10 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
           <p>{llmAnalysis?.overview ?? reading.summary}</p>
         </div>
       </section>
+
+      <p className="entertainment-notice result-notice">
+        本结果由塔罗牌与 AI 生成，纯属娱乐，仅供参考，不构成医疗、法律、投资或其他专业建议。
+      </p>
 
       <section className={`llm-status-panel is-${llmStatus}`}>
         <Sparkles size={18} />

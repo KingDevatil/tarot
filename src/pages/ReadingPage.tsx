@@ -367,6 +367,10 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
               <strong>{question}</strong>
             </div>
 
+            <p className="entertainment-notice">
+              塔罗占卜纯属娱乐，仅供参考，不构成医疗、法律、投资或其他专业建议。
+            </p>
+
             <button
               className="primary-button full-width"
               type="button"

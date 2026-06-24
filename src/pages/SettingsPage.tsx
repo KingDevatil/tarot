@@ -1,4 +1,4 @@
-import { Save, SlidersHorizontal, TestTube2 } from 'lucide-react';
+import { Save, ShieldAlert, SlidersHorizontal, TestTube2 } from 'lucide-react';
 import { useState } from 'react';
 import { testLlmConnection } from '../lib/llmAnalysis';
 import {
@@ -95,7 +95,6 @@ export function SettingsPage() {
       <section className="section-header">
         <div>
           <h1>配置</h1>
-          <p>开启后，可在问题类别中生成定制问题，并在结果页生成辅助解析。</p>
         </div>
       </section>
 
@@ -103,8 +102,7 @@ export function SettingsPage() {
         <div className="panel-title">
           <SlidersHorizontal size={22} />
           <div>
-            <h2>LLM 辅助解析</h2>
-            <p>未开启或请求失败时，问题与结果都会回退到本地模板和默认牌义。</p>
+            <h2>LLM 设置</h2>
           </div>
         </div>
 
@@ -192,32 +190,6 @@ export function SettingsPage() {
           </label>
         </div>
 
-        <div className="settings-note">
-          <strong>思考模式</strong>
-          <p>
-            DeepSeek 和 MiMo 会明确发送思考开关。通用兼容接口仅在开启时尝试发送 thinking 参数，是否生效取决于服务商和模型；思考模式通常更慢，并会消耗更多输出 Token。
-          </p>
-        </div>
-
-        <div className="settings-note">
-          <strong>格式容错</strong>
-          <p>
-            LLM 会被要求只返回 JSON。前端会自动提取 JSON、校验字段、补齐缺失内容；如果仍然失败，会显示本地牌义解析。
-          </p>
-        </div>
-
-        <div className="settings-note">
-          <strong>{providerPreset.label}</strong>
-          <p>{providerPreset.note}</p>
-        </div>
-
-        <div className="settings-note">
-          <strong>前端直连限制</strong>
-          <p>
-            API Key 会按服务商分别保存在本机浏览器，切换服务商时会自动带出对应 Key。Base URL 只填写兼容协议根路径，程序会自动拼接 /chat/completions。部分 LLM 服务不允许浏览器跨域直连，这种情况下请求会失败并回退本地解析。
-          </p>
-        </div>
-
         <div className="hero-actions">
           <button className="primary-button" type="button" onClick={save}>
             <Save size={18} />
@@ -243,6 +215,24 @@ export function SettingsPage() {
           <p>{testState.message}</p>
           {testState.status === 'success' ? <code>{testState.detail}</code> : null}
         </div>
+      </section>
+
+      <section className="disclaimer-panel">
+        <div className="panel-title">
+          <ShieldAlert size={22} />
+          <div>
+            <h2>免责条款</h2>
+          </div>
+        </div>
+        <p>
+          本应用提供的塔罗占卜、问题生成和 AI 解析内容均为自动生成，纯属娱乐，仅供参考，不代表事实、预测结果或专业意见。
+        </p>
+        <p>
+          请勿将相关内容作为医疗诊断、法律意见、投资建议、财务决策或其他重大现实决定的唯一依据。因使用、误解或依赖相关内容产生的后果，由使用者自行承担。
+        </p>
+        <p>
+          LLM 可能产生错误、遗漏、偏见或不准确内容。涉及重要事项时，请结合真实信息并咨询具备资质的专业人士。
+        </p>
       </section>
     </main>
   );
