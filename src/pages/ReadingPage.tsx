@@ -1,8 +1,10 @@
-import { ChevronLeft, RotateCcw, Shuffle, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, LoaderCircle, RotateCcw, Shuffle, Sparkles, WandSparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CardView } from '../components/CardView';
 import { paramOptions, questionCategories, topics } from '../data/questions';
 import { getSpread } from '../data/spreads';
+import { generateLlmQuestion } from '../lib/llmAnalysis';
+import { loadLlmConfig } from '../lib/llmConfig';
 import {
   buildQuestion,
   createDrawDeck,
@@ -18,6 +20,10 @@ interface ReadingPageProps {
 
 type RitualStage = 'select' | 'shuffle' | 'cut' | 'draw';
 
+const SHUFFLE_TRANSITION_MS = 900;
+const CUT_TRANSITION_MS = 760;
+const CARD_REVEAL_MS = 720;
+
 export function ReadingPage({ onComplete }: ReadingPageProps) {
   const [topicId, setTopicId] = useState<TopicId>('daily');
   const categories = questionCategories.filter((item) => item.topic === topicId);
@@ -30,17 +36,53 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   const [drawDeck, setDrawDeck] = useState<DrawCandidate[]>([]);
   const [drawnCards, setDrawnCards] = useState<DrawnCard[]>([]);
   const [isDrawCompleteOpen, setIsDrawCompleteOpen] = useState(false);
+  const [selectedShuffleCard, setSelectedShuffleCard] = useState<number | null>(null);
+  const [selectedCutPile, setSelectedCutPile] = useState<number | null>(null);
+  const [revealingSlot, setRevealingSlot] = useState<number | null>(null);
+  const transitionTimers = useRef<number[]>([]);
+  const [llmConfig] = useState(() => loadLlmConfig());
+  const [customContexts, setCustomContexts] = useState<Record<string, string>>({});
+  const [generatedQuestions, setGeneratedQuestions] = useState<Record<string, string>>({});
+  const [questionGeneration, setQuestionGeneration] = useState<{
+    categoryId: string;
+    status: 'idle' | 'loading' | 'error';
+    message: string;
+  }>({ categoryId: '', status: 'idle', message: '' });
 
   const selectedTopic = topics.find((item) => item.id === topicId) ?? topics[0];
   const SelectedTopicIcon = selectedTopic.icon;
   const currentSpread = getSpread(category.defaultSpread);
 
-  const question = useMemo(
+  const standardQuestion = useMemo(
     () => buildQuestion(category.questionTemplate, params),
     [category.questionTemplate, params],
   );
+  const customContext = customContexts[categoryId] ?? '';
+  const generatedQuestion = generatedQuestions[categoryId] ?? '';
+  const question = generatedQuestion || standardQuestion;
+
+  useEffect(() => () => {
+    transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  const scheduleTransition = (callback: () => void, delay: number) => {
+    const timer = window.setTimeout(() => {
+      transitionTimers.current = transitionTimers.current.filter((item) => item !== timer);
+      callback();
+    }, delay);
+    transitionTimers.current.push(timer);
+  };
+
+  const resetRitualAnimation = () => {
+    transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
+    transitionTimers.current = [];
+    setSelectedShuffleCard(null);
+    setSelectedCutPile(null);
+    setRevealingSlot(null);
+  };
 
   const setTopic = (nextTopicId: TopicId) => {
+    resetRitualAnimation();
     const nextCategory = questionCategories.find((item) => item.topic === nextTopicId);
     setTopicId(nextTopicId);
     setCategoryId(nextCategory?.id ?? categoryId);
@@ -54,6 +96,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   };
 
   const setCategory = (nextCategoryId: string) => {
+    resetRitualAnimation();
     setCategoryId(nextCategoryId);
     setParams({});
     setStage('select');
@@ -62,9 +105,63 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     setDrawDeck([]);
     setDrawnCards([]);
     setIsDrawCompleteOpen(false);
+    setQuestionGeneration({ categoryId: '', status: 'idle', message: '' });
+  };
+
+  const updateParam = (paramKey: ParamKey, value: string) => {
+    setParams((current) => ({ ...current, [paramKey]: value }));
+    setGeneratedQuestions((current) => {
+      if (!current[categoryId]) return current;
+      const next = { ...current };
+      delete next[categoryId];
+      return next;
+    });
+    setQuestionGeneration({ categoryId: '', status: 'idle', message: '' });
+  };
+
+  const updateCustomContext = (value: string) => {
+    setCustomContexts((current) => ({ ...current, [categoryId]: value }));
+    setGeneratedQuestions((current) => {
+      if (!current[categoryId]) return current;
+      const next = { ...current };
+      delete next[categoryId];
+      return next;
+    });
+    setQuestionGeneration({ categoryId: '', status: 'idle', message: '' });
+  };
+
+  const generateQuestion = async () => {
+    setQuestionGeneration({
+      categoryId,
+      status: 'loading',
+      message: '正在根据类别和你的描述整理问题...',
+    });
+    try {
+      const nextQuestion = await generateLlmQuestion(
+        selectedTopic,
+        category,
+        params,
+        customContext,
+        standardQuestion,
+        llmConfig,
+      );
+      setGeneratedQuestions((current) => ({ ...current, [categoryId]: nextQuestion }));
+      setQuestionGeneration({
+        categoryId,
+        status: 'idle',
+        message: '问题已生成，可以开始洗牌。',
+      });
+    } catch (error) {
+      setQuestionGeneration({
+        categoryId,
+        status: 'error',
+        message: error instanceof Error ? error.message : '问题生成失败，请重试',
+      });
+    }
   };
 
   const startShuffle = () => {
+    resetRitualAnimation();
     setReading(null);
     setPickedSlots([]);
     setDrawnCards([]);
@@ -73,13 +170,33 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     setStage('shuffle');
   };
 
-  const startDraw = () => {
-    setPickedSlots([]);
-    setIsDrawCompleteOpen(false);
-    setStage('draw');
+  const selectShuffleCard = (index: number) => {
+    if (selectedShuffleCard !== null) return;
+    setSelectedShuffleCard(index);
+    scheduleTransition(() => {
+      setSelectedShuffleCard(null);
+      setStage('cut');
+    }, SHUFFLE_TRANSITION_MS);
+  };
+
+  const selectCutPile = (index: number) => {
+    if (selectedCutPile !== null) return;
+    setSelectedCutPile(index);
+    scheduleTransition(() => {
+      setSelectedCutPile(null);
+      setPickedSlots([]);
+      setIsDrawCompleteOpen(false);
+      setStage('draw');
+    }, CUT_TRANSITION_MS);
+  };
+
+  const returnToQuestion = () => {
+    resetRitualAnimation();
+    setStage('select');
   };
 
   const pickCard = (slotIndex: number) => {
+    if (revealingSlot !== null) return;
     if (pickedSlots.includes(slotIndex)) return;
     if (drawnCards.length >= currentSpread.positions.length) return;
 
@@ -93,18 +210,31 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
         position: currentSpread.positions[drawnCards.length],
       },
     ];
+    setRevealingSlot(slotIndex);
     setDrawnCards(nextDrawnCards);
     setPickedSlots((current) => [...current, slotIndex]);
 
     if (nextDrawnCards.length === currentSpread.positions.length) {
-      setIsDrawCompleteOpen(true);
       setReading(
         createReadingFromDraws(
-          { topicId, categoryId, params },
+          {
+            topicId,
+            categoryId,
+            params,
+            customContext: customContext.trim() || undefined,
+            generatedQuestion: generatedQuestion || undefined,
+          },
           nextDrawnCards.map(({ card, orientation }) => ({ card, orientation })),
         ),
       );
     }
+
+    scheduleTransition(() => {
+      setRevealingSlot(null);
+      if (nextDrawnCards.length === currentSpread.positions.length) {
+        setIsDrawCompleteOpen(true);
+      }
+    }, CARD_REVEAL_MS);
   };
 
   const finishReading = () => {
@@ -114,13 +244,23 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   };
 
   const allParamsReady = category.requiredParams.every((key) => params[key]);
+  const hasCustomContext = Boolean(customContext.trim());
+  const requiresGeneratedQuestion = llmConfig.enabled && hasCustomContext;
+  const isGeneratingQuestion =
+    questionGeneration.categoryId === categoryId
+    && questionGeneration.status === 'loading';
+  const canGenerateQuestion = allParamsReady && hasCustomContext && !isGeneratingQuestion;
+  const canStartShuffle =
+    allParamsReady
+    && (!requiresGeneratedQuestion || Boolean(generatedQuestion))
+    && !isGeneratingQuestion;
 
   return (
     <main className="screen reading-screen">
       <section className="section-header">
         <div>
           <h1>{pageTitle(stage)}</h1>
-          <p>{pageDescription(stage)}</p>
+          <p>{pageDescription(stage, llmConfig.enabled)}</p>
         </div>
       </section>
 
@@ -178,7 +318,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
                       key={option.value}
                       className={params[paramKey] === option.value ? 'is-selected' : ''}
                       type="button"
-                      onClick={() => setParams((current) => ({ ...current, [paramKey]: option.value }))}
+                      onClick={() => updateParam(paramKey, option.value)}
                     >
                       {option.label}
                     </button>
@@ -187,15 +327,50 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
               </div>
             ))}
 
+            {llmConfig.enabled ? (
+              <div className="field-group custom-question-field">
+                <label htmlFor={`custom-question-${categoryId}`}>补充你的具体情况</label>
+                <textarea
+                  id={`custom-question-${categoryId}`}
+                  value={customContext}
+                  maxLength={500}
+                  rows={4}
+                  placeholder="例如：我们最近沟通变少，我不确定应该主动谈清楚，还是先给彼此一些空间。"
+                  onChange={(event) => updateCustomContext(event.target.value)}
+                />
+                <div className="custom-question-actions">
+                  <span>{customContext.length} / 500</span>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={!canGenerateQuestion}
+                    onClick={generateQuestion}
+                  >
+                    {isGeneratingQuestion ? (
+                      <LoaderCircle className="is-spinning" size={17} />
+                    ) : (
+                      <WandSparkles size={17} />
+                    )}
+                    {isGeneratingQuestion ? '生成中' : generatedQuestion ? '重新生成问题' : '生成问题'}
+                  </button>
+                </div>
+                {questionGeneration.categoryId === categoryId && questionGeneration.message ? (
+                  <p className={`question-generation-message is-${questionGeneration.status}`}>
+                    {questionGeneration.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="question-preview">
-              <span>标准化问题</span>
+              <span>{generatedQuestion ? 'LLM 生成问题' : '标准化问题'}</span>
               <strong>{question}</strong>
             </div>
 
             <button
               className="primary-button full-width"
               type="button"
-              disabled={!allParamsReady}
+              disabled={!canStartShuffle}
               onClick={startShuffle}
             >
               <Shuffle size={18} />
@@ -205,7 +380,12 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
         </div>
       ) : (
         <section className={`ritual-panel is-${stage}`}>
-          <button className="ritual-back-button" type="button" onClick={() => setStage('select')}>
+          <button
+            className="ritual-back-button"
+            type="button"
+            disabled={selectedShuffleCard !== null || selectedCutPile !== null || revealingSlot !== null}
+            onClick={returnToQuestion}
+          >
             <ChevronLeft size={18} />
             返回问题
           </button>
@@ -216,9 +396,15 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
           </div>
 
           {stage === 'shuffle' ? (
-            <div className="ritual-deck shuffle-deck">
+            <div className={`ritual-deck shuffle-deck ${selectedShuffleCard !== null ? 'is-resolving' : ''}`}>
               {Array.from({ length: 7 }).map((_, index) => (
-                <button className="shuffle-card-button" type="button" key={index} onClick={() => setStage('cut')}>
+                <button
+                  className={`shuffle-card-button ${selectedShuffleCard === index ? 'is-chosen' : ''}`}
+                  type="button"
+                  key={index}
+                  disabled={selectedShuffleCard !== null}
+                  onClick={() => selectShuffleCard(index)}
+                >
                   <CardView isBack isSelected={index === 3} />
                 </button>
               ))}
@@ -226,9 +412,15 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
           ) : null}
 
           {stage === 'cut' ? (
-            <div className="cut-deck">
+            <div className={`cut-deck ${selectedCutPile !== null ? 'is-resolving' : ''}`}>
               {Array.from({ length: 3 }).map((_, index) => (
-                <button className="cut-pile" type="button" key={index} onClick={startDraw}>
+                <button
+                  className={`cut-pile ${selectedCutPile === index ? 'is-chosen' : ''}`}
+                  type="button"
+                  key={index}
+                  disabled={selectedCutPile !== null}
+                  onClick={() => selectCutPile(index)}
+                >
                   <CardView isBack />
                   <span>{['左手牌堆', '中间牌堆', '右手牌堆'][index]}</span>
                 </button>
@@ -248,7 +440,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
                       className={`draw-slot ${drawn ? 'is-picked' : ''}`}
                       type="button"
                       key={index}
-                      disabled={disabled}
+                      disabled={disabled || revealingSlot !== null}
                       onClick={() => pickCard(index)}
                     >
                       <CardView isBack={!drawn} drawn={drawn} />
@@ -314,8 +506,12 @@ function pageTitle(stage: RitualStage) {
   return '抽牌';
 }
 
-function pageDescription(stage: RitualStage) {
-  if (stage === 'select') return '问题由类别和参数生成，不开放自由输入，避免低质量问题影响解析。';
+function pageDescription(stage: RitualStage, llmEnabled: boolean) {
+  if (stage === 'select') {
+    return llmEnabled
+      ? '选择类别和参数后，可以补充具体情况，由 LLM 整理为清晰的占卜问题。'
+      : '问题由类别和参数生成；开启 LLM 后，可以补充具体情况并生成定制问题。';
+  }
   if (stage === 'shuffle') return '由玩家手动确认洗牌完成，系统不会自动跳过仪式步骤。';
   if (stage === 'cut') return '从三组牌堆中选择一个，作为本次占卜的切入点。';
   return '从牌背中手动抽取需要的牌，抽满后再查看解析。';

@@ -1,14 +1,33 @@
 import { getQuestionCategory, getTopic } from '../data/questions';
 import { normalizeBaseUrl } from './llmConfig';
 import { getCardMeaning } from './reading';
-import type { DrawnCard, LlmAnalysis, LlmCardInterpretation, LlmConfig, ReadingResult } from '../types';
+import type {
+  DrawnCard,
+  LlmAnalysis,
+  LlmCardInterpretation,
+  LlmConfig,
+  QuestionCategory,
+  ReadingResult,
+  Topic,
+} from '../types';
 
 interface RawLlmAnalysis {
+  question?: unknown;
   overview?: unknown;
+  summary?: unknown;
+  overall?: unknown;
   cards?: unknown;
+  cardReadings?: unknown;
+  cardInterpretations?: unknown;
   advice?: unknown;
+  suggestions?: unknown;
+  actions?: unknown;
   emotionalFeedback?: unknown;
+  emotional_feedback?: unknown;
+  emotion?: unknown;
   riskNotes?: unknown;
+  risk_notes?: unknown;
+  risks?: unknown;
 }
 
 export interface LlmConnectionTestResult {
@@ -23,6 +42,58 @@ export class LlmAnalysisError extends Error {
     this.name = 'LlmAnalysisError';
   }
 }
+
+export const generateLlmQuestion = async (
+  topic: Topic,
+  category: QuestionCategory,
+  params: Record<string, string>,
+  customContext: string,
+  standardQuestion: string,
+  config: LlmConfig,
+): Promise<string> => {
+  const context = customContext.trim();
+  if (!context) {
+    throw new LlmAnalysisError('请先填写你想咨询的具体情况');
+  }
+  if (!config.enabled || !config.baseUrl.trim() || !config.model.trim() || !config.apiKey.trim()) {
+    throw new LlmAnalysisError('LLM 配置不完整，请先在配置页开启并填写接口信息');
+  }
+
+  const result = await requestLlmContent(config, {
+    temperature: Math.min(config.temperature, 0.7),
+    maxTokens: 256,
+    messages: [
+      {
+        role: 'system',
+        content: [
+          '你是塔罗占卜问题整理助手。',
+          '根据固定问题类别和用户描述，生成一个清晰、具体、适合塔罗进行自我观察的问题。',
+          '只返回 JSON 对象，格式为 {"question":"问题文本"}。',
+          '问题必须保持在给定类别内，使用第一人称，只问一个核心问题。',
+          '避免绝对预言、读心、医疗、法律、投资、生死判断；遇到高风险内容时改写为情绪、行动或可控因素层面的提问。',
+          '不要添加解释、建议、Markdown 或额外字段。',
+        ].join('\n'),
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          topic: topic.name,
+          category: category.label,
+          selectedParams: params,
+          standardQuestion,
+          userContext: context,
+        }, null, 2),
+      },
+    ],
+  });
+
+  const parsed = parseLlmJson(result.content);
+  const question = normalizeText(parsed.question, '').replace(/\s+/g, ' ').trim();
+  if (!question) {
+    throw new LlmAnalysisError('LLM 未返回有效问题，请重试');
+  }
+  return /[？?]$/.test(question) ? question : `${question}？`;
+};
 
 export const generateLlmAnalysis = async (
   reading: ReadingResult,
@@ -282,8 +353,8 @@ const buildReadingPayload = (reading: ReadingResult) => {
 const parseLlmJson = (content: string): RawLlmAnalysis => {
   const cleaned = content
     .trim()
-    .replace(/^```(?:json)?/i, '')
-    .replace(/```$/i, '')
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
     .trim();
 
   const direct = tryParseJson(cleaned);
@@ -292,6 +363,10 @@ const parseLlmJson = (content: string): RawLlmAnalysis => {
   const objectText = extractFirstJsonObject(cleaned);
   const extracted = objectText ? tryParseJson(objectText) : null;
   if (extracted) return extracted;
+
+  const repaired = repairJsonText(objectText ?? cleaned);
+  const repairedParsed = tryParseJson(repaired);
+  if (repairedParsed) return repairedParsed;
 
   throw new LlmAnalysisError('LLM 输出不是有效 JSON，已回退到本地解析');
 };
@@ -304,6 +379,10 @@ const tryParseJson = (text: string): RawLlmAnalysis | null => {
     return null;
   }
 };
+
+const repairJsonText = (text: string) => text
+  .replace(/^\uFEFF/, '')
+  .replace(/,\s*([}\]])/g, '$1');
 
 const extractFirstJsonObject = (text: string) => {
   const start = text.indexOf('{');
@@ -341,16 +420,22 @@ const normalizeLlmAnalysis = (
   reading: ReadingResult,
   model: string,
 ): LlmAnalysis => {
-  const cards = normalizeCards(raw.cards, reading.cards);
+  const cards = normalizeCards(
+    pickFirst(raw.cards, raw.cardReadings, raw.cardInterpretations),
+    reading.cards,
+  );
   return {
-    overview: normalizeText(raw.overview, reading.summary),
+    overview: normalizeText(pickFirst(raw.overview, raw.summary, raw.overall), reading.summary),
     cards,
-    advice: normalizeStringArray(raw.advice, reading.advice.split('\n')).slice(0, 5),
+    advice: normalizeStringArray(
+      pickFirst(raw.advice, raw.suggestions, raw.actions),
+      reading.advice.split('\n'),
+    ).slice(0, 5),
     emotionalFeedback: normalizeText(
-      raw.emotionalFeedback,
+      pickFirst(raw.emotionalFeedback, raw.emotional_feedback, raw.emotion),
       '你已经通过明确问题和抽牌完成了一次整理。接下来适合把牌面提醒落实到一个具体行动上，而不是急着追求确定答案。',
     ),
-    riskNotes: normalizeStringArray(raw.riskNotes, [
+    riskNotes: normalizeStringArray(pickFirst(raw.riskNotes, raw.risk_notes, raw.risks), [
       '牌面适合作为自我观察与决策辅助，不应替代现实沟通和专业建议。',
     ]).slice(0, 4),
     source: 'llm',
@@ -360,20 +445,42 @@ const normalizeLlmAnalysis = (
 };
 
 const normalizeCards = (value: unknown, cards: DrawnCard[]): LlmCardInterpretation[] => {
-  const rawCards = Array.isArray(value) ? value : [];
+  const rawCards = normalizeRawCards(value, cards);
   return cards.map((drawn, index) => {
     const raw = rawCards[index] && typeof rawCards[index] === 'object'
-      ? (rawCards[index] as Partial<LlmCardInterpretation>)
+      ? (rawCards[index] as Partial<LlmCardInterpretation> & {
+        meaning?: unknown;
+        analysis?: unknown;
+        message?: unknown;
+      })
       : {};
     return {
       positionId: drawn.position.id,
       label: drawn.position.label,
       cardName: drawn.card.name,
       orientation: drawn.orientation,
-      interpretation: normalizeText(raw.interpretation, getCardMeaning(drawn)),
+      interpretation: normalizeText(
+        pickFirst(raw.interpretation, raw.meaning, raw.analysis, raw.message),
+        getCardMeaning(drawn),
+      ),
     };
   });
 };
+
+const normalizeRawCards = (value: unknown, cards: DrawnCard[]) => {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  return cards.map((drawn) =>
+    record[drawn.position.id]
+    ?? record[drawn.position.label]
+    ?? record[drawn.card.name]
+    ?? {},
+  );
+};
+
+const pickFirst = (...values: unknown[]) =>
+  values.find((value) => value !== undefined && value !== null && value !== '');
 
 const normalizeText = (value: unknown, fallback: string) => {
   if (typeof value !== 'string') return fallback;
@@ -382,6 +489,13 @@ const normalizeText = (value: unknown, fallback: string) => {
 };
 
 const normalizeStringArray = (value: unknown, fallback: string[]) => {
+  if (typeof value === 'string') {
+    const lines = value
+      .split(/\n|；|;/)
+      .map((item) => item.replace(/^[-*\d.、\s]+/, '').trim())
+      .filter(Boolean);
+    return lines.length ? lines : fallback;
+  }
   if (!Array.isArray(value)) return fallback;
   const normalized = value
     .filter((item): item is string => typeof item === 'string')

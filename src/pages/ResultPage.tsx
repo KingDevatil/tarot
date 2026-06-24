@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, RotateCcw, Sparkles } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CardView } from '../components/CardView';
 import { getQuestionCategory, getTopic } from '../data/questions';
@@ -10,7 +10,6 @@ import type { LlmAnalysis, ReadingResult } from '../types';
 interface ResultPageProps {
   reading: ReadingResult;
   onRestart: () => void;
-  onLibrary: () => void;
   onReadingUpdated: (reading: ReadingResult) => void;
 }
 
@@ -38,12 +37,13 @@ const getLlmAnalysisRequest = (reading: ReadingResult) => {
   return request;
 };
 
-export function ResultPage({ reading, onRestart, onLibrary, onReadingUpdated }: ResultPageProps) {
+export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageProps) {
   const topic = getTopic(reading.input.topicId);
   const category = getQuestionCategory(reading.input.categoryId);
   const [llmAnalysis, setLlmAnalysis] = useState<LlmAnalysis | undefined>(reading.llmAnalysis);
   const [llmStatus, setLlmStatus] = useState<'disabled' | 'loading' | 'ready' | 'fallback'>('disabled');
   const [llmMessage, setLlmMessage] = useState('');
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +97,18 @@ export function ResultPage({ reading, onRestart, onLibrary, onReadingUpdated }: 
     return () => {
       cancelled = true;
     };
-  }, [onReadingUpdated, reading]);
+  }, [onReadingUpdated, reading, retryNonce]);
+
+  const retryLlmAnalysis = () => {
+    llmFailedAttempts.delete(getLlmAttemptKey(reading));
+    setLlmAnalysis(undefined);
+    setRetryNonce((current) => current + 1);
+  };
+
+  const canRetryLlm =
+    llmStatus === 'fallback'
+    && !reading.llmAnalysis
+    && isLlmConfigUsable(loadLlmConfig());
 
   return (
     <main className="screen result-screen">
@@ -118,15 +129,16 @@ export function ResultPage({ reading, onRestart, onLibrary, onReadingUpdated }: 
           <h2>{reading.spread.name}</h2>
           <p>{llmAnalysis?.overview ?? reading.summary}</p>
         </div>
-        <button className="secondary-button" type="button" onClick={onLibrary}>
-          <BookOpen size={18} />
-          查看牌义
-        </button>
       </section>
 
       <section className={`llm-status-panel is-${llmStatus}`}>
         <Sparkles size={18} />
         <span>{llmMessage}</span>
+        {canRetryLlm ? (
+          <button className="llm-retry-button" type="button" onClick={retryLlmAnalysis}>
+            重新请求 LLM
+          </button>
+        ) : null}
       </section>
 
       <section className="drawn-card-list">

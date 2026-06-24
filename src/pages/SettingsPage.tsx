@@ -95,7 +95,7 @@ export function SettingsPage() {
       <section className="section-header">
         <div>
           <h1>配置</h1>
-          <p>开启后，结果页会尝试使用 LLM 根据问题、牌阵、牌位和正逆位生成辅助解析。</p>
+          <p>开启后，可在问题类别中生成定制问题，并在结果页生成辅助解析。</p>
         </div>
       </section>
 
@@ -104,7 +104,7 @@ export function SettingsPage() {
           <SlidersHorizontal size={22} />
           <div>
             <h2>LLM 辅助解析</h2>
-            <p>未开启或请求失败时，系统自动使用默认牌义解析规则。</p>
+            <p>未开启或请求失败时，问题与结果都会回退到本地模板和默认牌义。</p>
           </div>
         </div>
 

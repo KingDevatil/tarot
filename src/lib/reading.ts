@@ -75,7 +75,9 @@ export const createReadingFromDraws = (
     position: spread.positions[index],
   }));
 
-  const question = buildQuestion(category.questionTemplate, input.params);
+  const question =
+    input.generatedQuestion?.trim()
+    || buildQuestion(category.questionTemplate, input.params);
   const summary = buildSummary(cards, category.interpretationFocus);
   const advice = cards
     .map(

@@ -77,6 +77,8 @@ export interface ReadingInput {
   topicId: TopicId;
   categoryId: string;
   params: Record<string, string>;
+  customContext?: string;
+  generatedQuestion?: string;
 }
 
 export interface ReadingResult {

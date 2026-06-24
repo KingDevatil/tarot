@@ -61,7 +61,6 @@ export function App() {
         <ResultPage
           reading={activeReading}
           onRestart={() => setView('reading')}
-          onLibrary={() => setView('library')}
           onReadingUpdated={updateReading}
         />
       );
