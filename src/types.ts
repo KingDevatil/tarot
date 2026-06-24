@@ -1,8 +1,17 @@
 import type { LucideIcon } from 'lucide-react';
 
-export type TopicId = 'daily' | 'love' | 'career' | 'choice' | 'inner' | 'trend';
+export type TopicId = 'daily' | 'love' | 'career' | 'choice' | 'inner' | 'trend' | 'spreads';
 
-export type SpreadId = 'single' | 'three_trend' | 'relationship_5';
+export type SpreadId =
+  | 'single'
+  | 'three_trend'
+  | 'relationship_5'
+  | 'choice_compare'
+  | 'body_mind_spirit'
+  | 'horseshoe_7'
+  | 'celtic_cross_10';
+
+export type SpreadLayout = 'single' | 'line' | 'relationship' | 'choice' | 'triangle' | 'horseshoe' | 'celtic';
 
 export type Orientation = 'upright' | 'reversed';
 
@@ -21,6 +30,11 @@ export type ParamKey =
   | 'relationshipStage'
   | 'careerFocus'
   | 'choiceMode'
+  | 'choiceOptionCount'
+  | 'choiceOptionA'
+  | 'choiceOptionB'
+  | 'choiceOptionC'
+  | 'choiceOptionD'
   | 'innerFocus'
   | 'trendFocus';
 
@@ -51,12 +65,15 @@ export interface SpreadPosition {
   id: string;
   label: string;
   prompt: string;
+  layoutArea?: string;
 }
 
 export interface Spread {
   id: SpreadId;
   name: string;
   description: string;
+  layout: SpreadLayout;
+  themes?: string[];
   positions: SpreadPosition[];
 }
 

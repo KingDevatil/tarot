@@ -1,8 +1,9 @@
 import { ChevronLeft, LoaderCircle, RotateCcw, Shuffle, Sparkles, WandSparkles } from 'lucide-react';
+import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CardView } from '../components/CardView';
 import { paramOptions, questionCategories, topics } from '../data/questions';
-import { getSpread } from '../data/spreads';
+import { getChoiceOptionCount, getSpreadForReading } from '../data/spreads';
 import { generateLlmQuestion } from '../lib/llmAnalysis';
 import { loadLlmConfig } from '../lib/llmConfig';
 import {
@@ -12,7 +13,7 @@ import {
   saveReading,
   type DrawCandidate,
 } from '../lib/reading';
-import type { DrawnCard, ParamKey, ReadingResult, TopicId } from '../types';
+import type { DrawnCard, ParamKey, QuestionCategory, ReadingResult, Spread, TopicId } from '../types';
 
 interface ReadingPageProps {
   onComplete: (reading: ReadingResult) => void;
@@ -42,7 +43,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   const [cutOrder, setCutOrder] = useState<number[]>([]);
   const [revealedCount, setRevealedCount] = useState(0);
   const transitionTimers = useRef<number[]>([]);
-  const [llmConfig] = useState(() => loadLlmConfig());
+  const llmConfig = loadLlmConfig();
   const [customContexts, setCustomContexts] = useState<Record<string, string>>({});
   const [generatedQuestions, setGeneratedQuestions] = useState<Record<string, string>>({});
   const [questionGeneration, setQuestionGeneration] = useState<{
@@ -53,11 +54,17 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
 
   const selectedTopic = topics.find((item) => item.id === topicId) ?? topics[0];
   const SelectedTopicIcon = selectedTopic.icon;
-  const currentSpread = getSpread(category.defaultSpread);
+  const currentSpread = getSpreadForReading(category.defaultSpread, params);
+  const isChoiceComparison = category.defaultSpread === 'choice_compare';
+  const isSpreadTopic = topicId === 'spreads';
 
   const standardQuestion = useMemo(
-    () => buildQuestion(category.questionTemplate, params),
-    [category.questionTemplate, params],
+    () => buildQuestion(category.questionTemplate, {
+      ...params,
+      spreadName: currentSpread.name,
+      spreadThemes: currentSpread.themes?.join('、') ?? currentSpread.description,
+    }),
+    [category.questionTemplate, currentSpread.description, currentSpread.name, currentSpread.themes, params],
   );
   const customContext = customContexts[categoryId] ?? '';
   const generatedQuestion = generatedQuestions[categoryId] ?? '';
@@ -268,7 +275,10 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     onComplete(reading);
   };
 
-  const allParamsReady = category.requiredParams.every((key) => params[key]);
+  const requiredParamKeys = isChoiceComparison
+    ? getRequiredChoiceParamKeys(params)
+    : category.requiredParams;
+  const allParamsReady = requiredParamKeys.every((key) => params[key]?.trim());
   const hasCustomContext = Boolean(customContext.trim());
   const requiresGeneratedQuestion = llmConfig.enabled && hasCustomContext;
   const isGeneratingQuestion =
@@ -318,9 +328,9 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
               </div>
             </div>
 
-            <div className="field-group">
+            <div className={`field-group ${isSpreadTopic ? 'spread-picker-field' : ''}`}>
               <label>问题类别</label>
-              <div className="segmented-list">
+              <div className={isSpreadTopic ? 'spread-option-grid' : 'segmented-list'}>
                 {categories.map((item) => (
                   <button
                     key={item.id}
@@ -328,29 +338,37 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
                     type="button"
                     onClick={() => setCategory(item.id)}
                   >
-                    {item.label}
+                    {isSpreadTopic ? (
+                      <SpreadOption category={item} params={params} />
+                    ) : (
+                      item.label
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
-            {category.requiredParams.map((paramKey) => (
-              <div className="field-group" key={paramKey}>
-                <label>{paramLabel(paramKey)}</label>
-                <div className="choice-row">
-                  {paramOptions[paramKey].map((option) => (
-                    <button
-                      key={option.value}
-                      className={params[paramKey] === option.value ? 'is-selected' : ''}
-                      type="button"
-                      onClick={() => updateParam(paramKey, option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+            {isChoiceComparison ? (
+              <ChoiceComparisonFields params={params} updateParam={updateParam} />
+            ) : (
+              category.requiredParams.map((paramKey) => (
+                <div className="field-group" key={paramKey}>
+                  <label>{paramLabel(paramKey)}</label>
+                  <div className="choice-row">
+                    {paramOptions[paramKey].map((option) => (
+                      <button
+                        key={option.value}
+                        className={params[paramKey] === option.value ? 'is-selected' : ''}
+                        type="button"
+                        onClick={() => updateParam(paramKey, option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
 
             {llmConfig.enabled ? (
               <div className="field-group custom-question-field">
@@ -390,6 +408,10 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
             <div className="question-preview">
               <span>{generatedQuestion ? 'LLM 生成问题' : '标准化问题'}</span>
               <strong>{question}</strong>
+              <em>{currentSpread.name} · 需要抽取 {currentSpread.positions.length} 张</em>
+              {currentSpread.themes?.length ? (
+                <small>适用主题：{currentSpread.themes.join(' / ')}</small>
+              ) : null}
             </div>
 
             <p className="entertainment-notice">
@@ -521,17 +543,21 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
           ) : null}
 
           {stage === 'reveal' && reading ? (
-            <div className="reveal-spread">
+            <SpreadCardLayout spread={reading.spread} className="reveal-spread">
               {reading.cards.map((drawn, index) => {
                 const isRevealed = index < revealedCount;
                 return (
-                  <article className={`reveal-position ${isRevealed ? 'is-revealed' : ''}`} key={drawn.position.id}>
+                  <article
+                    className={`reveal-position ${isRevealed ? 'is-revealed' : ''}`}
+                    key={drawn.position.id}
+                    style={drawn.position.layoutArea ? { gridArea: drawn.position.layoutArea } : undefined}
+                  >
                     <CardView isBack={!isRevealed} drawn={drawn} />
                     <span>{drawn.position.label}</span>
                   </article>
                 );
               })}
-            </div>
+            </SpreadCardLayout>
           ) : null}
 
           {stage === 'reveal' && reading && isDrawCompleteOpen ? (
@@ -542,14 +568,17 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
                   <h2>抽牌完成</h2>
                   <p>{reading.question}</p>
                 </div>
-                <div className="draw-complete-cards">
+                <SpreadCardLayout spread={reading.spread} className="draw-complete-cards">
                   {reading.cards.map((drawn) => (
-                    <article key={drawn.position.id}>
+                    <article
+                      key={drawn.position.id}
+                      style={drawn.position.layoutArea ? { gridArea: drawn.position.layoutArea } : undefined}
+                    >
                       <CardView drawn={drawn} />
                       <span>{drawn.position.label}</span>
                     </article>
                   ))}
-                </div>
+                </SpreadCardLayout>
                 <div className="ritual-actions">
                   <button className="ghost-button" type="button" onClick={startShuffle}>
                     <RotateCcw size={18} />
@@ -615,12 +644,101 @@ function pageDescription(stage: RitualStage, llmEnabled: boolean) {
   return '从牌背中选出牌阵需要的牌；选牌阶段不提前查看牌面。';
 }
 
+interface SpreadOptionProps {
+  category: QuestionCategory;
+  params: Record<string, string>;
+}
+
+function SpreadOption({ category, params }: SpreadOptionProps) {
+  const spread = getSpreadForReading(category.defaultSpread, params);
+  return (
+    <>
+      <strong>{spread.name}</strong>
+      <span>{spread.positions.length} 张 · {spread.description}</span>
+      {spread.themes?.length ? <em>适用：{spread.themes.join(' / ')}</em> : null}
+    </>
+  );
+}
+
+interface SpreadCardLayoutProps {
+  spread: Spread;
+  className: string;
+  children: React.ReactNode;
+}
+
+function SpreadCardLayout({ spread, className, children }: SpreadCardLayoutProps) {
+  return (
+    <div className={`${className} spread-layout spread-layout--${spread.layout}`} data-spread={spread.id}>
+      {children}
+    </div>
+  );
+}
+
+const choiceOptionParamKeys = ['choiceOptionA', 'choiceOptionB', 'choiceOptionC', 'choiceOptionD'] as const;
+const choiceOptionLabels = ['A', 'B', 'C', 'D'] as const;
+
+function getRequiredChoiceParamKeys(params: Record<string, string>): ParamKey[] {
+  const optionCount = getChoiceOptionCount(params);
+  return [...choiceOptionParamKeys.slice(0, optionCount)];
+}
+
+interface ChoiceComparisonFieldsProps {
+  params: Record<string, string>;
+  updateParam: (paramKey: ParamKey, value: string) => void;
+}
+
+function ChoiceComparisonFields({ params, updateParam }: ChoiceComparisonFieldsProps) {
+  const optionCount = getChoiceOptionCount(params);
+
+  return (
+    <>
+      <div className="field-group">
+        <label>比较选项数量</label>
+        <div className="choice-row">
+          {paramOptions.choiceOptionCount.map((option) => (
+            <button
+              key={option.value}
+              className={(params.choiceOptionCount || '2') === option.value ? 'is-selected' : ''}
+              type="button"
+              onClick={() => updateParam('choiceOptionCount', option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="field-group choice-options-field">
+        <label>填写要比较的选项</label>
+        <div className="choice-option-inputs">
+          {choiceOptionParamKeys.slice(0, optionCount).map((paramKey, index) => (
+            <label className="choice-option-input" key={paramKey}>
+              <span>选项 {choiceOptionLabels[index]}</span>
+              <input
+                value={params[paramKey] ?? ''}
+                maxLength={28}
+                placeholder={['继续推进', '暂缓观察', '更换方向', '维持现状'][index]}
+                onChange={(event) => updateParam(paramKey, event.target.value)}
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function paramLabel(paramKey: ParamKey) {
   const labels: Record<ParamKey, string> = {
     timeRange: '时间范围',
     relationshipStage: '关系阶段',
     careerFocus: '关注方向',
     choiceMode: '倾向选项',
+    choiceOptionCount: '比较选项数量',
+    choiceOptionA: '选项 A',
+    choiceOptionB: '选项 B',
+    choiceOptionC: '选项 C',
+    choiceOptionD: '选项 D',
     innerFocus: '当前状态',
     trendFocus: '趋势主题',
   };

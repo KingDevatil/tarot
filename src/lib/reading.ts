@@ -1,6 +1,6 @@
 import { tarotCards } from '../data/cards';
 import { getQuestionCategory } from '../data/questions';
-import { getSpread } from '../data/spreads';
+import { formatChoiceOptions, getSpreadForReading } from '../data/spreads';
 import type { DrawnCard, ReadingInput, ReadingResult, TarotCard } from '../types';
 
 const HISTORY_KEY = 'tarot_reading_history_v1';
@@ -17,7 +17,16 @@ const shuffle = <T,>(items: T[]) => {
 };
 
 export const buildQuestion = (template: string, params: Record<string, string>) =>
-  template.replace(/\{(\w+)\}/g, (_, key: string) => params[key] ?? '');
+  template.replace(/\{(\w+)\}/g, (_, key: string) => {
+    if (key === 'choiceOptions') return formatChoiceOptions(params);
+    return params[key] ?? '';
+  });
+
+const buildSpreadQuestionParams = (params: Record<string, string>, spread: ReturnType<typeof getSpreadForReading>) => ({
+  ...params,
+  spreadName: spread.name,
+  spreadThemes: spread.themes?.join('、') ?? spread.description,
+});
 
 const orientationLabel = (orientation: DrawnCard['orientation']) =>
   orientation === 'upright' ? '正位' : '逆位';
@@ -50,7 +59,7 @@ const buildSummary = (cards: DrawnCard[], focus: string[]) => {
 
 export const createReading = (input: ReadingInput): ReadingResult => {
   const category = getQuestionCategory(input.categoryId);
-  const spread = getSpread(category.defaultSpread);
+  const spread = getSpreadForReading(category.defaultSpread, input.params);
   const draws = createDrawDeck(spread.positions.length);
 
   return createReadingFromDraws(input, draws);
@@ -69,7 +78,7 @@ export const createReadingFromDraws = (
   draws: DrawCandidate[],
 ): ReadingResult => {
   const category = getQuestionCategory(input.categoryId);
-  const spread = getSpread(category.defaultSpread);
+  const spread = getSpreadForReading(category.defaultSpread, input.params);
   const cards = draws.slice(0, spread.positions.length).map<DrawnCard>((draw, index) => ({
     ...draw,
     position: spread.positions[index],
@@ -77,7 +86,7 @@ export const createReadingFromDraws = (
 
   const question =
     input.generatedQuestion?.trim()
-    || buildQuestion(category.questionTemplate, input.params);
+    || buildQuestion(category.questionTemplate, buildSpreadQuestionParams(input.params, spread));
   const summary = buildSummary(cards, category.interpretationFocus);
   const advice = cards
     .map(

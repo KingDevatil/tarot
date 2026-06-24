@@ -4,6 +4,7 @@ import {
   CalendarDays,
   GitFork,
   Heart,
+  LayoutTemplate,
   Sparkles,
 } from 'lucide-react';
 import type { ParamKey, ParamOption, QuestionCategory, Topic } from '../types';
@@ -33,9 +34,9 @@ export const topics: Topic[] = [
   {
     id: 'choice',
     name: '选择判断',
-    description: '在两个方向之间看清更适合的取舍方式。',
+    description: '在两个或多个选项之间比较收益、代价和更稳妥路径。',
     icon: GitFork,
-    defaultSpread: 'three_trend',
+    defaultSpread: 'choice_compare',
   },
   {
     id: 'inner',
@@ -49,6 +50,13 @@ export const topics: Topic[] = [
     name: '近期趋势',
     description: '观察未来一段时间的整体走向和关键提醒。',
     icon: Sparkles,
+    defaultSpread: 'three_trend',
+  },
+  {
+    id: 'spreads',
+    name: '牌阵',
+    description: '选择常见牌阵，按牌阵结构处理不同主题的问题。',
+    icon: LayoutTemplate,
     defaultSpread: 'three_trend',
   },
 ];
@@ -74,6 +82,15 @@ export const paramOptions: Record<ParamKey, ParamOption[]> = {
     { value: '暂缓观察', label: '暂缓观察' },
     { value: '更换方向', label: '更换方向' },
   ],
+  choiceOptionCount: [
+    { value: '2', label: '2 个选项' },
+    { value: '3', label: '3 个选项' },
+    { value: '4', label: '4 个选项' },
+  ],
+  choiceOptionA: [],
+  choiceOptionB: [],
+  choiceOptionC: [],
+  choiceOptionD: [],
   innerFocus: [
     { value: '情绪低落', label: '情绪低落' },
     { value: '焦虑不安', label: '焦虑不安' },
@@ -85,6 +102,8 @@ export const paramOptions: Record<ParamKey, ParamOption[]> = {
     { value: '计划推进', label: '计划推进' },
   ],
 };
+
+const spreadQuestionTemplate = '我想使用{spreadName}观察{spreadThemes}相关问题，本次最需要看清什么？';
 
 export const questionCategories: QuestionCategory[] = [
   {
@@ -171,11 +190,11 @@ export const questionCategories: QuestionCategory[] = [
   {
     id: 'choice_direction',
     topic: 'choice',
-    label: '现在应该怎么选',
-    questionTemplate: '面对当前选择，我更适合{choiceMode}吗？',
-    requiredParams: ['choiceMode'],
-    defaultSpread: 'three_trend',
-    interpretationFocus: ['选择动机', '潜在代价', '更合适路径'],
+    label: '比较多个选项',
+    questionTemplate: '面对当前选择，我应该如何比较这些选项：{choiceOptions}？',
+    requiredParams: ['choiceOptionCount', 'choiceOptionA', 'choiceOptionB'],
+    defaultSpread: 'choice_compare',
+    interpretationFocus: ['判断背景', '各选项收益代价', '更合适路径'],
   },
   {
     id: 'inner_emotion',
@@ -212,6 +231,60 @@ export const questionCategories: QuestionCategory[] = [
     requiredParams: ['timeRange', 'trendFocus'],
     defaultSpread: 'three_trend',
     interpretationFocus: ['风险来源', '误判点', '规避建议'],
+  },
+  {
+    id: 'spread_single',
+    topic: 'spreads',
+    label: '单张指引',
+    questionTemplate: spreadQuestionTemplate,
+    requiredParams: [],
+    defaultSpread: 'single',
+    interpretationFocus: ['核心重点', '短期提醒', '行动建议'],
+  },
+  {
+    id: 'spread_three_trend',
+    topic: 'spreads',
+    label: '三张时间线',
+    questionTemplate: spreadQuestionTemplate,
+    requiredParams: [],
+    defaultSpread: 'three_trend',
+    interpretationFocus: ['过去影响', '当前状态', '近期趋势'],
+  },
+  {
+    id: 'spread_body_mind_spirit',
+    topic: 'spreads',
+    label: '身心灵三牌',
+    questionTemplate: spreadQuestionTemplate,
+    requiredParams: [],
+    defaultSpread: 'body_mind_spirit',
+    interpretationFocus: ['身体层面', '心理层面', '精神层面'],
+  },
+  {
+    id: 'spread_relationship_5',
+    topic: 'spreads',
+    label: '五张关系',
+    questionTemplate: spreadQuestionTemplate,
+    requiredParams: [],
+    defaultSpread: 'relationship_5',
+    interpretationFocus: ['双方状态', '隐藏阻力', '发展趋势', '行动建议'],
+  },
+  {
+    id: 'spread_horseshoe_7',
+    topic: 'spreads',
+    label: '七张马蹄',
+    questionTemplate: spreadQuestionTemplate,
+    requiredParams: [],
+    defaultSpread: 'horseshoe_7',
+    interpretationFocus: ['背景因素', '隐藏变量', '外部影响', '可能结果'],
+  },
+  {
+    id: 'spread_celtic_cross_10',
+    topic: 'spreads',
+    label: '凯尔特十字',
+    questionTemplate: spreadQuestionTemplate,
+    requiredParams: [],
+    defaultSpread: 'celtic_cross_10',
+    interpretationFocus: ['核心现状', '深层根源', '外部环境', '长期倾向'],
   },
 ];
 

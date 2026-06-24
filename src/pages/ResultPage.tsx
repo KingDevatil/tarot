@@ -27,11 +27,11 @@ const getLlmAttemptKey = (reading: ReadingResult) => {
   ].join('|');
 };
 
-const getLlmAnalysisRequest = (reading: ReadingResult) => {
+const getLlmAnalysisRequest = (reading: ReadingResult, signal?: AbortSignal) => {
   const attemptKey = getLlmAttemptKey(reading);
   const existing = llmAnalysisRequests.get(attemptKey);
   if (existing) return existing;
-  const request = generateLlmAnalysis(reading, loadLlmConfig()).finally(() => {
+  const request = generateLlmAnalysis(reading, loadLlmConfig(), signal).finally(() => {
     llmAnalysisRequests.delete(attemptKey);
   });
   llmAnalysisRequests.set(attemptKey, request);
@@ -52,6 +52,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const config = loadLlmConfig();
     const currentSavedAnalysis =
       reading.llmAnalysis?.version === LLM_ANALYSIS_VERSION
@@ -86,7 +87,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
 
     setLlmStatus('loading');
     setLlmMessage('正在生成 LLM 辅助解析...');
-    getLlmAnalysisRequest(reading)
+    getLlmAnalysisRequest(reading, controller.signal)
       .then((analysis) => {
         if (cancelled) return;
         const updatedReading = { ...reading, llmAnalysis: analysis };
@@ -98,6 +99,8 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
       })
       .catch((error: Error) => {
         if (cancelled) return;
+        // AbortError means the user navigated away; do not update state
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         llmFailedAttempts.add(attemptKey);
         setLlmStatus('fallback');
         setLlmMessage(error.message);
@@ -105,6 +108,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [onReadingUpdated, reading, retryNonce]);
 

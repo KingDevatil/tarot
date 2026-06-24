@@ -511,6 +511,42 @@ button.tarot-card {
   cursor: pointer;
 }
 
+.spread-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.spread-option-grid button {
+  display: grid;
+  gap: 6px;
+  min-height: 112px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.spread-option-grid button.is-selected {
+  border-color: rgba(244, 213, 141, 0.72);
+  background: rgba(244, 213, 141, 0.13);
+}
+
+.spread-option-grid button strong {
+  font-size: 16px;
+}
+
+.spread-option-grid button span,
+.spread-option-grid button em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.55;
+}
+
 .question-preview {
   display: grid;
   gap: 8px;
@@ -519,6 +555,18 @@ button.tarot-card {
   border: 1px solid rgba(244, 213, 141, 0.22);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.22);
+}
+
+.question-preview em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.question-preview small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .entertainment-notice {
@@ -841,6 +889,52 @@ button.tarot-card {
   gap: 18px;
 }
 
+.spread-layout {
+  align-items: end;
+}
+
+.spread-layout--single {
+  grid-template-columns: minmax(130px, 180px);
+  grid-template-areas: 'center';
+}
+
+.spread-layout--line {
+  grid-template-columns: repeat(3, minmax(120px, 160px));
+  grid-template-areas: 'past present future';
+}
+
+.spread-layout--triangle {
+  grid-template-columns: repeat(3, minmax(120px, 160px));
+  grid-template-areas:
+    '. spirit .'
+    'body . mind';
+}
+
+.spread-layout--relationship {
+  grid-template-columns: repeat(3, minmax(110px, 150px));
+  grid-template-areas:
+    'self block other'
+    '. trend .'
+    '. advice .';
+}
+
+.spread-layout--choice {
+  grid-template-columns: repeat(auto-fit, minmax(112px, 150px));
+}
+
+.spread-layout--horseshoe {
+  grid-template-columns: repeat(7, minmax(82px, 128px));
+  grid-template-areas: 'past present hidden obstacle outside advice outcome';
+}
+
+.spread-layout--celtic {
+  grid-template-columns: repeat(6, minmax(82px, 124px));
+  grid-template-areas:
+    '. crowning crowning . environment outcome'
+    'past core cross near-future self hope-fear'
+    '. root root . . .';
+}
+
 .reveal-position {
   display: grid;
   gap: 10px;
@@ -913,6 +1007,29 @@ button.tarot-card {
   justify-content: center;
   gap: 14px;
   margin: 16px 0;
+}
+
+.draw-complete-cards.spread-layout {
+  grid-template-columns: repeat(auto-fit, minmax(76px, 104px));
+  align-items: end;
+}
+
+.draw-complete-cards.spread-layout--single {
+  grid-template-columns: minmax(76px, 108px);
+}
+
+.draw-complete-cards.spread-layout--line,
+.draw-complete-cards.spread-layout--triangle,
+.draw-complete-cards.spread-layout--relationship {
+  grid-template-columns: repeat(3, minmax(76px, 104px));
+}
+
+.draw-complete-cards.spread-layout--horseshoe {
+  grid-template-columns: repeat(7, minmax(62px, 86px));
+}
+
+.draw-complete-cards.spread-layout--celtic {
+  grid-template-columns: repeat(6, minmax(58px, 82px));
 }
 
 .draw-complete-cards article {
@@ -1002,6 +1119,11 @@ button.tarot-card {
 }
 
 .advice-panel {
+  margin-top: 18px;
+}
+
+.advice-panel > .primary-button {
+  justify-self: start;
   margin-top: 18px;
 }
 
@@ -1149,6 +1271,36 @@ button.tarot-card {
   color: var(--text);
 }
 
+.choice-options-field {
+  gap: 12px;
+}
+
+.choice-option-inputs {
+  display: grid;
+  gap: 10px;
+}
+
+.choice-option-input {
+  display: grid;
+  gap: 7px;
+}
+
+.choice-option-input input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: 0;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text);
+}
+
+.choice-option-input input:focus {
+  border-color: rgba(244, 213, 141, 0.72);
+  box-shadow: 0 0 0 2px rgba(244, 213, 141, 0.13);
+}
+
 .settings-field select {
   color-scheme: dark;
   cursor: pointer;
@@ -1238,6 +1390,49 @@ button.tarot-card {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
+}
+
+.library-groups {
+  display: grid;
+  gap: 22px;
+}
+
+.library-group {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.library-group__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.library-group__header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.library-group__header p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.library-group__header > span {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid rgba(244, 213, 141, 0.26);
+  border-radius: 999px;
+  background: rgba(244, 213, 141, 0.1);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 760;
 }
 
 .library-detail {
@@ -1595,6 +1790,7 @@ button.tarot-card {
 
   .section-header,
   .recent-panel,
+  .library-group__header,
   .result-summary {
     flex-direction: column;
     align-items: stretch;
@@ -1602,6 +1798,21 @@ button.tarot-card {
 
   .drawn-card-row {
     grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .spread-layout--triangle,
+  .spread-layout--relationship,
+  .spread-layout--horseshoe,
+  .spread-layout--celtic {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 150px));
+    grid-template-areas: none;
+  }
+
+  .spread-layout--triangle > *,
+  .spread-layout--relationship > *,
+  .spread-layout--horseshoe > *,
+  .spread-layout--celtic > * {
+    grid-area: auto !important;
   }
 }
 

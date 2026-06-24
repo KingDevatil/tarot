@@ -136,10 +136,12 @@ export const generateLlmQuestion = async (
 export const generateLlmAnalysis = async (
   reading: ReadingResult,
   config: LlmConfig,
+  signal?: AbortSignal,
 ): Promise<LlmAnalysis> => {
   const request: Parameters<typeof requestLlmContent>[1] = {
     temperature: config.temperature,
     maxTokens: ANALYSIS_MAX_TOKENS,
+    signal,
     messages: [
       {
         role: 'system',
@@ -155,6 +157,14 @@ export const generateLlmAnalysis = async (
   let raw = parseLlmJson(result.content);
 
   if (!isAnalysisSpecificEnough(raw, reading)) {
+    // Simple backoff before quality retry, abortable via the same signal
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(resolve, 800);
+      if (signal) {
+        if (signal.aborted) { window.clearTimeout(timer); reject(signal.reason); return; }
+        signal.addEventListener('abort', () => { window.clearTimeout(timer); reject(signal.reason); }, { once: true });
+      }
+    });
     const retryResult = await requestLlmContent(config, {
       ...request,
       messages: [
@@ -217,10 +227,25 @@ const requestLlmContent = async (
     messages: Array<{ role: 'system' | 'user'; content: string }>;
     temperature: number;
     maxTokens?: number;
+    signal?: AbortSignal;
   },
 ): Promise<{ content: string; finishReason: string }> => {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), config.timeoutMs);
+  const timeoutController = new AbortController();
+  const timeout = window.setTimeout(() => timeoutController.abort(), config.timeoutMs);
+
+  // Merge external signal (user abort) with internal timeout signal
+  const signals = [timeoutController.signal];
+  if (request.signal) signals.push(request.signal);
+  const signal = typeof AbortSignal.any === 'function'
+    ? AbortSignal.any(signals)
+    : (() => {
+        const merged = new AbortController();
+        for (const s of signals) {
+          if (s.aborted) { merged.abort(s.reason); break; }
+          s.addEventListener('abort', () => merged.abort(s.reason), { once: true });
+        }
+        return merged.signal;
+      })();
 
   try {
     const body: Record<string, unknown> = {
@@ -249,11 +274,12 @@ const requestLlmContent = async (
       method: 'POST',
       headers: buildHeaders(config),
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal,
     });
 
     if (!response.ok) {
-      throw new LlmAnalysisError(`LLM 请求失败：HTTP ${response.status}`);
+      console.error('[LLM] HTTP error', response.status);
+      throw new LlmAnalysisError('请求LLM服务失败，请稍后重试或检查配置');
     }
 
     const payload = await response.json();
@@ -261,9 +287,11 @@ const requestLlmContent = async (
     if (!content) {
       const finishReason = getFinishReason(payload);
       if (finishReason === 'length') {
-        throw new LlmAnalysisError(`LLM 已连接成功，但模型把输出额度耗在推理过程里，最终正文为空。请重试，或换用非深度思考模型。响应预览：${previewPayload(payload)}`);
+        console.error('[LLM] Empty content with length finish', previewPayload(payload));
+        throw new LlmAnalysisError('请求已连接但模型未返回有效内容，请重试或换用非深度思考模型');
       }
-      throw new LlmAnalysisError(`LLM 响应中没有可解析内容，请确认 Base URL、模型名称和鉴权方式。响应预览：${previewPayload(payload)}`);
+      console.error('[LLM] Unparseable response', previewPayload(payload));
+      throw new LlmAnalysisError('LLM响应无法解析，请确认 Base URL、模型名称和鉴权方式是否正确');
     }
 
     return {
@@ -272,6 +300,9 @@ const requestLlmContent = async (
     };
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
+      if (request.signal?.aborted) {
+        throw error;
+      }
       throw new LlmAnalysisError(`LLM 请求超过 ${Math.round(config.timeoutMs / 1000)} 秒未返回，已回退到本地解析`);
     }
     if (error instanceof LlmAnalysisError) {
@@ -280,6 +311,7 @@ const requestLlmContent = async (
     throw new LlmAnalysisError('LLM 解析不可用，可能是网络、跨域或接口配置问题');
   } finally {
     window.clearTimeout(timeout);
+    timeoutController.abort();
   }
 };
 
@@ -381,6 +413,7 @@ const buildSystemPrompt = () => `
 - 选择判断：重点比较当前选择的动机、代价、短期结果和更稳妥路径。
 - 内在状态：重点回答情绪根源、未满足需求、恢复稳定的具体方式。
 - 近期趋势：重点回答时间范围内的起势、变化点、风险和可控行动。
+- 牌阵：重点尊重 spread.positions 的牌位结构；先解释每个牌位在该牌阵中的作用，再综合牌阵整体给出结论。
 
 硬性约束：
 - overview 第一处标点之前必须出现明确判断，禁止以“塔罗牌显示”“这组牌提醒你”“未来充满可能”开头。

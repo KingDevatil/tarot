@@ -21,7 +21,7 @@ export function App() {
   const navigate = (nextView: AppView) => {
     setView(nextView);
     if (nextView !== 'result') {
-      setActiveReading((current) => (nextView === 'home' ? current : current));
+      setActiveReading(null);
     }
   };
 
