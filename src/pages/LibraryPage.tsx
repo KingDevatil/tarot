@@ -23,8 +23,8 @@ export function LibraryPage() {
     <main className="screen library-screen">
       <section className="section-header">
         <div>
-          <h1>大阿尔卡那牌库</h1>
-          <p>查看每张大阿尔卡那的关键词、正逆位含义和行动建议。</p>
+          <h1>完整塔罗牌库</h1>
+          <p>查看78张大、小阿尔卡那的关键词、正逆位含义和行动建议。</p>
         </div>
         <label className="search-box">
           <Search size={18} />
@@ -47,7 +47,7 @@ export function LibraryPage() {
               }}
             />
             <div>
-              <span>#{String(card.number).padStart(2, '0')}</span>
+              <span>{cardLabel(card)}</span>
               <h2>{card.name}</h2>
               <p>{card.keywords.join(' / ')}</p>
             </div>
@@ -63,7 +63,7 @@ export function LibraryPage() {
               <span>关闭</span>
             </button>
             <div>
-              <span>#{String(selectedCard.number).padStart(2, '0')} / {selectedCard.enName}</span>
+              <span>{cardLabel(selectedCard)} / {selectedCard.enName}</span>
               <h2>{selectedCard.name}</h2>
               <p>{selectedCard.keywords.join(' / ')}</p>
             </div>
@@ -86,4 +86,12 @@ export function LibraryPage() {
       ) : null}
     </main>
   );
+}
+
+function cardLabel(card: (typeof tarotCards)[number]) {
+  if (card.arcana === 'minor') {
+    const courtLabel = ['侍从', '骑士', '王后', '国王'][card.number - 11];
+    return `${card.displayNumeral ?? courtLabel} · 小阿尔卡那`;
+  }
+  return `#${String(card.number).padStart(2, '0')} · 大阿尔卡那`;
 }

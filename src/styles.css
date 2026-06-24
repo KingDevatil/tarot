@@ -269,6 +269,28 @@ button.tarot-card {
   white-space: nowrap;
 }
 
+.tarot-card__numeral {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 3;
+  min-width: 42px;
+  padding: 5px 10px;
+  border: 1px solid rgba(245, 211, 136, 0.78);
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.66);
+  color: #f6dfaa;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(13px, 2.1vw, 18px);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: 0.08em;
+  transform: translateX(-50%);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
 .tarot-card__orientation {
   position: absolute;
   top: 14px;

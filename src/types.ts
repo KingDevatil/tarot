@@ -6,6 +6,12 @@ export type SpreadId = 'single' | 'three_trend' | 'relationship_5';
 
 export type Orientation = 'upright' | 'reversed';
 
+export type Arcana = 'major' | 'minor';
+
+export type MinorSuit = 'wands' | 'cups' | 'swords' | 'pentacles';
+
+export type CardRank = 'number' | 'page' | 'knight' | 'queen' | 'king';
+
 export type AppView = 'home' | 'reading' | 'result' | 'history' | 'library' | 'settings';
 
 export type LlmProvider = 'openai_compatible' | 'deepseek' | 'mimo';
@@ -59,6 +65,10 @@ export interface TarotCard {
   number: number;
   name: string;
   enName: string;
+  arcana?: Arcana;
+  suit?: MinorSuit;
+  rank?: CardRank;
+  displayNumeral?: string;
   image: string;
   thumbnail: string;
   keywords: string[];

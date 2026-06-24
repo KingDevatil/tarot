@@ -1,11 +1,13 @@
 ﻿import type { TarotCard } from '../types';
 
+import { minorArcanaCards } from './minorCards';
+
 const cardImages = (fileName: string) => ({
   image: new URL(`../../assets/tarot/cards/major/${fileName}`, import.meta.url).href,
   thumbnail: new URL(`../../assets/tarot/cards/major_thumbs/${fileName}`, import.meta.url).href,
 });
 
-export const tarotCards: TarotCard[] = [
+export const majorArcanaCards: TarotCard[] = [
   {
     id: 'major_00',
     number: 0,
@@ -249,4 +251,6 @@ export const tarotCards: TarotCard[] = [
     advice: '完成闭环，不要让事情停在“差不多”。',
   },
 ];
+
+export const tarotCards: TarotCard[] = [...majorArcanaCards, ...minorArcanaCards];
 

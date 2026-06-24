@@ -47,6 +47,11 @@ export function CardView({
       ) : (
         <>
           <img src={imageSource} alt={activeCard.name} loading={loading} decoding="async" />
+          {activeCard.displayNumeral ? (
+            <span className="tarot-card__numeral" aria-hidden="true">
+              {activeCard.displayNumeral}
+            </span>
+          ) : null}
           {orientation ? (
             <span className={`tarot-card__orientation is-${orientation}`}>
               {orientation === 'upright' ? '正' : '逆'}
