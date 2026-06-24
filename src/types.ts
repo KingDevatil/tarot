@@ -114,6 +114,7 @@ export interface LlmAnalysis {
 
 export interface LlmConfig {
   enabled: boolean;
+  thinkingEnabled: boolean;
   provider: LlmProvider;
   baseUrl: string;
   model: string;

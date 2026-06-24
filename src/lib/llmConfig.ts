@@ -30,6 +30,7 @@ export const llmProviderPresets: Record<LlmProvider, {
 
 export const defaultLlmConfig: LlmConfig = {
   enabled: false,
+  thinkingEnabled: false,
   provider: 'openai_compatible',
   baseUrl: llmProviderPresets.openai_compatible.baseUrl,
   model: llmProviderPresets.openai_compatible.model,

@@ -30,6 +30,8 @@ interface RawLlmAnalysis {
   risks?: unknown;
 }
 
+const QUESTION_GENERATION_MAX_TOKENS = 4096;
+
 export interface LlmConnectionTestResult {
   message: string;
   model: string;
@@ -61,7 +63,7 @@ export const generateLlmQuestion = async (
 
   const result = await requestLlmContent(config, {
     temperature: Math.min(config.temperature, 0.7),
-    maxTokens: 256,
+    maxTokens: QUESTION_GENERATION_MAX_TOKENS,
     messages: [
       {
         role: 'system',
@@ -163,9 +165,18 @@ const requestLlmContent = async (
   try {
     const body: Record<string, unknown> = {
       model: config.model.trim(),
-      temperature: request.temperature,
       messages: request.messages,
     };
+    if (!config.thinkingEnabled) {
+      body.temperature = request.temperature;
+    }
+    if (config.provider === 'deepseek' || config.provider === 'mimo') {
+      body.thinking = {
+        type: config.thinkingEnabled ? 'enabled' : 'disabled',
+      };
+    } else if (config.thinkingEnabled) {
+      body.thinking = { type: 'enabled' };
+    }
     if (request.maxTokens) {
       if (config.provider === 'mimo') {
         body.max_completion_tokens = request.maxTokens;

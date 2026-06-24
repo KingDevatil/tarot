@@ -23,6 +23,7 @@ const getLlmAttemptKey = (reading: ReadingResult) => {
     config.provider,
     config.baseUrl,
     config.model,
+    config.thinkingEnabled ? 'thinking' : 'non-thinking',
   ].join('|');
 };
 

@@ -117,6 +117,15 @@ export function SettingsPage() {
           <span>开启 LLM 辅助解析</span>
         </label>
 
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={config.thinkingEnabled}
+            onChange={(event) => update('thinkingEnabled', event.target.checked)}
+          />
+          <span>开启思考模式</span>
+        </label>
+
         <div className="settings-grid">
           <label className="settings-field">
             <span>服务商</span>
@@ -181,6 +190,13 @@ export function SettingsPage() {
               onChange={(event) => update('timeoutMs', Number(event.target.value))}
             />
           </label>
+        </div>
+
+        <div className="settings-note">
+          <strong>思考模式</strong>
+          <p>
+            DeepSeek 和 MiMo 会明确发送思考开关。通用兼容接口仅在开启时尝试发送 thinking 参数，是否生效取决于服务商和模型；思考模式通常更慢，并会消耗更多输出 Token。
+          </p>
         </div>
 
         <div className="settings-note">
