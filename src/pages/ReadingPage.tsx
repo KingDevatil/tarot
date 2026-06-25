@@ -53,7 +53,10 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
   const [shuffleRound, setShuffleRound] = useState(0);
   const [cutOrder, setCutOrder] = useState<number[]>([]);
   const [revealedCount, setRevealedCount] = useState(0);
+  const [shuffleDragX, setShuffleDragX] = useState(0);
   const transitionTimers = useRef<number[]>([]);
+  const shuffleStartX = useRef<number | null>(null);
+  const drawReadyRef = useRef<HTMLDivElement | null>(null);
   const llmConfig = loadLlmConfig();
   const [customContexts, setCustomContexts] = useState<Record<string, string>>(
     initialInput?.customContext ? { [categoryId]: initialInput.customContext } : {},
@@ -116,6 +119,7 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
     transitionTimers.current = [];
     setSelectedShuffleCard(null);
     setShuffleRound(0);
+    setShuffleDragX(0);
     setCutOrder([]);
     setRevealedCount(0);
   };
@@ -221,11 +225,12 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
     setStage('shuffle');
   };
 
-  const selectShuffleCard = (index: number) => {
+  const completeShuffleGesture = (direction: number) => {
     if (selectedShuffleCard !== null) return;
-    setSelectedShuffleCard(index);
+    setSelectedShuffleCard(direction);
     scheduleTransition(() => {
       setSelectedShuffleCard(null);
+      setShuffleDragX(0);
       const nextRound = shuffleRound + 1;
       setShuffleRound(nextRound);
       if (nextRound >= SHUFFLE_ROUNDS) {
@@ -233,6 +238,29 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
         setStage('cut');
       }
     }, SHUFFLE_TRANSITION_MS);
+  };
+
+  const beginShuffleGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (selectedShuffleCard !== null) return;
+    shuffleStartX.current = event.clientX;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveShuffleGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (shuffleStartX.current === null || selectedShuffleCard !== null) return;
+    const distance = Math.max(-150, Math.min(150, event.clientX - shuffleStartX.current));
+    setShuffleDragX(distance);
+  };
+
+  const endShuffleGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (shuffleStartX.current === null || selectedShuffleCard !== null) return;
+    const distance = event.clientX - shuffleStartX.current;
+    shuffleStartX.current = null;
+    if (Math.abs(distance) >= 70) {
+      completeShuffleGesture(distance > 0 ? 1 : -1);
+    } else {
+      setShuffleDragX(0);
+    }
   };
 
   const selectCutPile = (index: number) => {
@@ -284,8 +312,14 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
         ),
       );
     }
-
   };
+
+  useEffect(() => {
+    if (!reading || stage !== 'draw') return;
+    window.requestAnimationFrame(() => {
+      drawReadyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [reading, stage]);
 
   const startReveal = () => {
     if (!reading || drawnCards.length !== currentSpread.positions.length) return;
@@ -512,69 +546,98 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
                   <span className={index < shuffleRound ? 'is-complete' : ''} key={index} />
                 ))}
               </div>
-              <div className={`ritual-deck shuffle-deck ${selectedShuffleCard !== null ? 'is-resolving' : ''}`}>
-                {Array.from({ length: 7 }).map((_, index) => (
-                  <button
-                    className={`shuffle-card-button ${selectedShuffleCard === index ? 'is-chosen' : ''}`}
-                    type="button"
-                    key={index}
-                    disabled={selectedShuffleCard !== null}
-                    onClick={() => selectShuffleCard(index)}
-                  >
-                    <CardView isBack isSelected={index === 3} />
-                  </button>
-                ))}
+              <div
+                className={`shuffle-gesture ${selectedShuffleCard !== null ? 'is-resolving' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`左右划动牌堆完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} 次洗牌`}
+                onPointerDown={beginShuffleGesture}
+                onPointerMove={moveShuffleGesture}
+                onPointerUp={endShuffleGesture}
+                onPointerCancel={endShuffleGesture}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowLeft') completeShuffleGesture(-1);
+                  if (event.key === 'ArrowRight') completeShuffleGesture(1);
+                }}
+              >
+                <div
+                  className="shuffle-gesture__deck"
+                  style={{
+                    '--shuffle-drag': `${shuffleDragX}px`,
+                    '--shuffle-rotate': `${shuffleDragX * 0.025}deg`,
+                  } as React.CSSProperties}
+                >
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div className="shuffle-gesture__card" key={index}>
+                      <CardView isBack />
+                    </div>
+                  ))}
+                </div>
+                <div className="shuffle-gesture__hint">
+                  <span aria-hidden="true">←</span>
+                  <strong>用手指缓慢划动牌堆</strong>
+                  <span aria-hidden="true">→</span>
+                  <small>跟随呼吸，让牌在手中重新排列</small>
+                </div>
               </div>
             </>
           ) : null}
 
           {stage === 'cut' ? (
-            <div className={`cut-deck ${cutOrder.length === 3 ? 'is-resolving' : ''}`}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <button
-                  className={`cut-pile ${cutOrder.includes(index) ? 'is-chosen' : ''}`}
-                  type="button"
-                  key={index}
-                  disabled={cutOrder.includes(index) || cutOrder.length === 3}
-                  onClick={() => selectCutPile(index)}
-                >
-                  <CardView isBack />
-                  <span>{['左手牌堆', '中间牌堆', '右手牌堆'][index]}</span>
-                  {cutOrder.includes(index) ? (
-                    <strong className="cut-order">{cutOrder.indexOf(index) + 1}</strong>
-                  ) : null}
-                </button>
-              ))}
+            <div className="cut-ritual">
+              <p>不要计算顺序。依直觉依次触碰三叠牌，它们会按照你的选择重新合为一体。</p>
+              <div className={`cut-deck ${cutOrder.length === 3 ? 'is-resolving' : ''}`}>
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <button
+                    className={`cut-pile ${cutOrder.includes(index) ? 'is-chosen' : ''}`}
+                    type="button"
+                    key={index}
+                    disabled={cutOrder.includes(index) || cutOrder.length === 3}
+                    onClick={() => selectCutPile(index)}
+                  >
+                    <CardView isBack />
+                    <span>{['左侧', '中央', '右侧'][index]}</span>
+                    {cutOrder.includes(index) ? (
+                      <strong className="cut-order">{cutOrder.indexOf(index) + 1}</strong>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
 
           {stage === 'draw' ? (
             <div className="manual-draw-area">
-              <div className="draw-slots">
-                {Array.from({ length: 12 }).map((_, index) => {
-                  const pickedOrder = pickedSlots.indexOf(index);
-                  const drawn = pickedOrder >= 0 ? drawnCards[pickedOrder] : undefined;
-                  const disabled = drawnCards.length >= currentSpread.positions.length && pickedOrder < 0;
-                  return (
-                    <button
-                      className={`draw-slot ${drawn ? 'is-picked' : ''}`}
-                      type="button"
-                      key={index}
-                      disabled={disabled || Boolean(drawn)}
-                      onClick={() => pickCard(index)}
-                    >
-                      <CardView isBack drawn={drawn} />
-                      <span>{drawn?.position.label ?? '点击抽取'}</span>
-                    </button>
-                  );
-                })}
-              </div>
               {reading ? (
-                <button className="primary-button reveal-button" type="button" onClick={startReveal}>
-                  <Sparkles size={18} />
-                  按牌位顺序翻牌
-                </button>
-              ) : null}
+                <div className="draw-ready" ref={drawReadyRef}>
+                  <span className="draw-ready__symbol" aria-hidden="true">✦</span>
+                  <strong>{currentSpread.positions.length} 张牌已选定</strong>
+                  <p>牌面仍然保持隐藏。准备好后，让它们依次回应你的问题。</p>
+                  <button className="primary-button reveal-button" type="button" onClick={startReveal}>
+                    <Sparkles size={18} />
+                    开始揭牌
+                  </button>
+                </div>
+              ) : (
+                <div className="draw-slots">
+                  {Array.from({ length: 12 }).map((_, index) => {
+                    const pickedOrder = pickedSlots.indexOf(index);
+                    const drawn = pickedOrder >= 0 ? drawnCards[pickedOrder] : undefined;
+                    return (
+                      <button
+                        className={`draw-slot ${drawn ? 'is-picked' : ''}`}
+                        type="button"
+                        key={index}
+                        disabled={Boolean(drawn)}
+                        onClick={() => pickCard(index)}
+                      >
+                        <CardView isBack drawn={drawn} />
+                        <span>{drawn?.position.label ?? '点击抽取'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -654,7 +717,7 @@ function ritualDescription(
   revealedCount: number,
 ) {
   if (stage === 'focus') return '先确认问题，再进入洗牌、切牌、抽牌和翻牌。';
-  if (stage === 'shuffle') return `保持专注，完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} / ${SHUFFLE_ROUNDS} 次洗牌。`;
+  if (stage === 'shuffle') return `左右划动牌堆，完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} / ${SHUFFLE_ROUNDS} 次洗牌。`;
   if (stage === 'cut') return `按你希望重新合牌的顺序选择三叠牌。已选择 ${cutCount} / 3。`;
   if (stage === 'reveal') return `按照牌阵位置依次翻开。已翻开 ${revealedCount} / ${totalCards} 张。`;
   return `${question} 已抽取 ${pickedCount} / ${totalCards} 张。`;
@@ -676,7 +739,7 @@ function pageDescription(stage: RitualStage, llmEnabled: boolean) {
       : '问题由类别和参数生成；开启 LLM 后，可以补充具体情况并生成定制问题。';
   }
   if (stage === 'focus') return '静心确认本次占卜只回应一个明确问题。';
-  if (stage === 'shuffle') return '由玩家手动确认洗牌完成，系统不会自动跳过仪式步骤。';
+  if (stage === 'shuffle') return '用手指划动整叠牌，让动作、呼吸与问题慢慢同步。';
   if (stage === 'cut') return '将牌分为三叠，并按选择顺序重新合牌。';
   if (stage === 'reveal') return '全部选牌完成后，按牌位顺序统一揭示牌面。';
   return '从牌背中选出牌阵需要的牌；选牌阶段不提前查看牌面。';
