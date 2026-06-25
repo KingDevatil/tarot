@@ -11,6 +11,7 @@ import { FormEvent, useState } from 'react';
 import { getSpread } from '../data/spreads';
 import { analyzeDivinationQuestion } from '../lib/llmAnalysis';
 import { loadLlmConfig } from '../lib/llmConfig';
+import { createFreeformReadingInput } from '../lib/readingFlow';
 import type {
   AppView,
   QuestionAnalysis,
@@ -63,14 +64,7 @@ export function HomePage({
     if (!analysis) return;
     const selected = analysis.recommendations.find((item) => item.id === selectedFlowId);
     if (!selected) return;
-    onStartReading({
-      topicId: analysis.topicId,
-      categoryId: analysis.categoryId,
-      params: analysis.params,
-      spreadId: selected.spreadId,
-      customContext: question.trim(),
-      generatedQuestion: analysis.normalizedQuestion,
-    });
+    onStartReading(createFreeformReadingInput(question, analysis, selected.spreadId));
   };
 
   return (
@@ -150,7 +144,10 @@ export function HomePage({
                 <span>{analysis.source === 'llm' ? 'LLM 分析' : '智能匹配'}</span>
               </p>
               <h2>为你推荐 3 种占卜方式</h2>
-              <blockquote>{analysis.normalizedQuestion}</blockquote>
+              <blockquote>
+                <strong>意图摘要（仅用于匹配）：</strong>
+                {analysis.normalizedQuestion}
+              </blockquote>
             </div>
             <button className="change-question-button" type="button" onClick={resetQuestion}>
               <RotateCcw size={16} />

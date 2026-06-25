@@ -84,10 +84,15 @@ export const createReadingFromDraws = (
     position: spread.positions[index],
   }));
 
-  const question =
-    input.generatedQuestion?.trim()
-    || buildQuestion(category.questionTemplate, buildSpreadQuestionParams(input.params, spread));
-  const summary = buildSummary(cards, category.interpretationFocus);
+  const question = input.questionSource === 'freeform'
+    ? input.customContext?.trim()
+      || buildQuestion(category.questionTemplate, buildSpreadQuestionParams(input.params, spread))
+    : input.generatedQuestion?.trim()
+      || buildQuestion(category.questionTemplate, buildSpreadQuestionParams(input.params, spread));
+  const summaryFocus = input.questionSource === 'freeform'
+    ? ['正式问题', '牌位含义', '可执行建议']
+    : category.interpretationFocus;
+  const summary = buildSummary(cards, summaryFocus);
   const advice = cards
     .map(
       (item) =>

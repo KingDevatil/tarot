@@ -1,10 +1,10 @@
 import { ArrowLeft, RotateCcw, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CardView } from '../components/CardView';
-import { getQuestionCategory, getTopic } from '../data/questions';
 import { generateLlmAnalysis, LLM_ANALYSIS_VERSION } from '../lib/llmAnalysis';
 import { isLlmConfigUsable, loadLlmConfig } from '../lib/llmConfig';
 import { getCardMeaning, updateSavedReading } from '../lib/reading';
+import { getReadingContextLabel } from '../lib/readingPresentation';
 import type { LlmAnalysis, ReadingResult } from '../types';
 
 interface ResultPageProps {
@@ -39,8 +39,6 @@ const getLlmAnalysisRequest = (reading: ReadingResult, signal?: AbortSignal) => 
 };
 
 export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageProps) {
-  const topic = getTopic(reading.input.topicId);
-  const category = getQuestionCategory(reading.input.categoryId);
   const savedLlmAnalysis =
     reading.llmAnalysis?.version === LLM_ANALYSIS_VERSION
       ? reading.llmAnalysis
@@ -138,7 +136,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
 
       <section className="result-summary">
         <div>
-          <span>{topic.name} / {category.label}</span>
+          <span>{getReadingContextLabel(reading)}</span>
           <h2>{reading.spread.name}</h2>
           <p>{llmAnalysis?.overview ?? reading.summary}</p>
         </div>

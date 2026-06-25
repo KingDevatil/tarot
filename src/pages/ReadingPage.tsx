@@ -38,6 +38,10 @@ const CARD_REVEAL_MS = 720;
 const SHUFFLE_VISUAL_CARDS = 9;
 
 export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
+  const isFreeformReading = initialInput?.questionSource === 'freeform';
+  const officialFreeformQuestion = isFreeformReading
+    ? initialInput.customContext?.trim() ?? ''
+    : '';
   const [topicId, setTopicId] = useState<TopicId>(initialInput?.topicId ?? 'daily');
   const categories = questionCategories.filter((item) => item.topic === topicId);
   const [categoryId, setCategoryId] = useState(initialInput?.categoryId ?? categories[0].id);
@@ -63,7 +67,9 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
     initialInput?.customContext ? { [categoryId]: initialInput.customContext } : {},
   );
   const [generatedQuestions, setGeneratedQuestions] = useState<Record<string, string>>(
-    initialInput?.generatedQuestion ? { [categoryId]: initialInput.generatedQuestion } : {},
+    initialInput?.questionSource !== 'freeform' && initialInput?.generatedQuestion
+      ? { [categoryId]: initialInput.generatedQuestion }
+      : {},
   );
   const [questionGeneration, setQuestionGeneration] = useState<{
     categoryId: string;
@@ -87,7 +93,9 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
   );
   const customContext = customContexts[categoryId] ?? '';
   const generatedQuestion = generatedQuestions[categoryId] ?? '';
-  const question = generatedQuestion || standardQuestion;
+  const question = isFreeformReading
+    ? officialFreeformQuestion
+    : generatedQuestion || standardQuestion;
 
   useEffect(() => () => {
     transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -311,7 +319,10 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
             categoryId,
             params,
             spreadId: currentSpread.id,
-            customContext: customContext.trim() || undefined,
+            questionSource: initialInput?.questionSource,
+            customContext: isFreeformReading
+              ? officialFreeformQuestion
+              : customContext.trim() || undefined,
             generatedQuestion: generatedQuestion || undefined,
           },
           nextDrawnCards.map(({ card, orientation }) => ({ card, orientation })),
@@ -351,10 +362,11 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
     ? getRequiredChoiceParamKeys(params)
     : category.requiredParams;
   const allParamsReady =
-    Boolean(generatedQuestion)
+    isFreeformReading
+    || Boolean(generatedQuestion)
     || requiredParamKeys.every((key) => params[key]?.trim());
   const hasCustomContext = Boolean(customContext.trim());
-  const requiresGeneratedQuestion = llmConfig.enabled && hasCustomContext;
+  const requiresGeneratedQuestion = !isFreeformReading && llmConfig.enabled && hasCustomContext;
   const isGeneratingQuestion =
     questionGeneration.categoryId === categoryId
     && questionGeneration.status === 'loading';
@@ -446,7 +458,7 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
               ))
             )}
 
-            {llmConfig.enabled ? (
+            {llmConfig.enabled && !isFreeformReading ? (
               <div className="field-group custom-question-field">
                 <label htmlFor={`custom-question-${categoryId}`}>补充你的具体情况</label>
                 <textarea
@@ -482,7 +494,13 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
             ) : null}
 
             <div className="question-preview">
-              <span>{generatedQuestion ? 'LLM 生成问题' : '标准化问题'}</span>
+              <span>
+                {isFreeformReading
+                  ? '原始问题'
+                  : generatedQuestion
+                    ? 'LLM 生成问题'
+                    : '标准化问题'}
+              </span>
               <strong>{question}</strong>
               <em>{currentSpread.name} · 需要抽取 {currentSpread.positions.length} 张</em>
               {currentSpread.themes?.length ? (

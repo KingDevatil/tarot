@@ -165,7 +165,7 @@ export const analyzeDivinationQuestion = async (
             '只输出 JSON，不要 Markdown 或解释。',
             'categoryId 必须来自 allowedCategories；spreadId 必须来自 allowedSpreads。',
             '第一个推荐应是最合适且复杂度最低的充分方案，后两个提供更深入或不同观察角度。',
-            'normalizedQuestion 使用第一人称，保留用户的具体对象与时间范围，只聚焦一个核心问题。',
+            'normalizedQuestion 仅作为意图摘要，用于说明用户想判断的对象、时间范围与核心诉求；它不是正式问题，也不得替代或改写用户原文。',
             'params 只填写能从原问题明确推断的字段，不确定时留空。',
           ].join('\n'),
         },
@@ -188,7 +188,7 @@ export const analyzeDivinationQuestion = async (
             })),
             output: {
               categoryId: 'allowed category id',
-              normalizedQuestion: 'question',
+              normalizedQuestion: 'intent summary only',
               params: {},
               recommendations: [
                 {
@@ -246,7 +246,7 @@ const normalizeQuestionAnalysis = (
     topicId: category.topic,
     categoryId,
     categoryLabel: category.label,
-    normalizedQuestion: /[？?]$/.test(normalizedQuestion) ? normalizedQuestion : `${normalizedQuestion}？`,
+    normalizedQuestion,
     params: { ...fallback.params, ...params },
     recommendations: completedRecommendations,
     source: 'llm',
@@ -281,7 +281,7 @@ const buildLocalQuestionAnalysis = (question: string): QuestionAnalysis => {
     topicId,
     categoryId: category.id,
     categoryLabel: category.label,
-    normalizedQuestion: /[？?]$/.test(question) ? question : `${question}？`,
+    normalizedQuestion: question,
     params,
     recommendations: spreadIds.map((spreadId, index) => {
       const spread = getSpread(spreadId);
@@ -670,21 +670,24 @@ const buildSystemPrompt = () => `
 - 合格：“在‘当前状态’牌位出现月亮逆位，说明你对黄金短期走势的焦虑正在放大噪声；它更支持先核对价格与消息来源，再决定是否行动。”
 `.trim();
 
-const buildReadingPayload = (reading: ReadingResult) => {
+export const buildReadingPayload = (reading: ReadingResult) => {
   const topic = getTopic(reading.input.topicId);
   const category = getQuestionCategory(reading.input.categoryId);
+  const isFreeform = reading.input.questionSource === 'freeform';
   return {
     question: reading.question,
-    topic: topic.name,
-    category: category.label,
+    topic: isFreeform ? '问题占卜' : topic.name,
+    category: isFreeform ? '自由问题' : category.label,
     params: reading.input.params,
-    userContext: reading.input.customContext ?? '',
+    userContext: isFreeform ? '' : reading.input.customContext ?? '',
     spread: {
       id: reading.spread.id,
       name: reading.spread.name,
       description: reading.spread.description,
     },
-    interpretationFocus: category.interpretationFocus,
+    interpretationFocus: isFreeform
+      ? ['直接回应正式问题', '结合牌位与牌义', '给出可验证的行动建议']
+      : category.interpretationFocus,
     localSummary: reading.summary,
     localAdvice: reading.advice,
     cards: reading.cards.map((drawn) => ({
@@ -746,7 +749,10 @@ const isAnalysisSpecificEnough = (raw: RawLlmAnalysis, reading: ReadingResult) =
 };
 
 const getQuestionAnchors = (reading: ReadingResult) => {
-  const source = `${reading.input.customContext ?? ''} ${reading.question}`
+  const source = reading.input.questionSource === 'freeform'
+    ? reading.question
+    : `${reading.input.customContext ?? ''} ${reading.question}`;
+  const normalizedSource = source
     .replace(/[，。！？、；：,.!?;:\s]/g, '');
   const ignored = new Set([
     '一周内',
@@ -767,8 +773,8 @@ const getQuestionAnchors = (reading: ReadingResult) => {
   ]);
   const anchors = new Set<string>();
   for (let length = 4; length >= 2; length -= 1) {
-    for (let index = 0; index <= source.length - length; index += 1) {
-      const value = source.slice(index, index + length);
+    for (let index = 0; index <= normalizedSource.length - length; index += 1) {
+      const value = normalizedSource.slice(index, index + length);
       if (!ignored.has(value)) anchors.add(value);
     }
   }

@@ -55,7 +55,9 @@ export function App() {
     if (view === 'reading') {
       return (
         <ReadingPage
-          key={preparedReading ? `${preparedReading.generatedQuestion}-${preparedReading.spreadId}` : 'manual'}
+          key={preparedReading
+            ? `${preparedReading.questionSource}-${preparedReading.customContext}-${preparedReading.generatedQuestion}-${preparedReading.spreadId}`
+            : 'manual'}
           initialInput={preparedReading ?? undefined}
           onComplete={completeReading}
         />

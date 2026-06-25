@@ -105,6 +105,7 @@ export interface ReadingInput {
   categoryId: string;
   params: Record<string, string>;
   spreadId?: SpreadId;
+  questionSource?: 'freeform' | 'template';
   customContext?: string;
   generatedQuestion?: string;
 }
