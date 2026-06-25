@@ -33,8 +33,9 @@ type RitualStage = 'select' | 'focus' | 'shuffle' | 'cut' | 'draw' | 'reveal';
 
 const SHUFFLE_ROUNDS = 3;
 const SHUFFLE_TRANSITION_MS = 680;
-const CUT_TRANSITION_MS = 620;
+const CUT_TRANSITION_MS = 1500;
 const CARD_REVEAL_MS = 720;
+const SHUFFLE_VISUAL_CARDS = 9;
 
 export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
   const [topicId, setTopicId] = useState<TopicId>(initialInput?.topicId ?? 'daily');
@@ -227,10 +228,15 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
 
   const completeShuffleGesture = (direction: number) => {
     if (selectedShuffleCard !== null) return;
+    if (Math.abs(shuffleDragX) < 70) {
+      setShuffleDragX(direction * 140);
+    }
     setSelectedShuffleCard(direction);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setShuffleDragX(0));
+    });
     scheduleTransition(() => {
       setSelectedShuffleCard(null);
-      setShuffleDragX(0);
       const nextRound = shuffleRound + 1;
       setShuffleRound(nextRound);
       if (nextRound >= SHUFFLE_ROUNDS) {
@@ -562,16 +568,26 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
               >
                 <div
                   className="shuffle-gesture__deck"
-                  style={{
-                    '--shuffle-drag': `${shuffleDragX}px`,
-                    '--shuffle-rotate': `${shuffleDragX * 0.025}deg`,
-                  } as React.CSSProperties}
                 >
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <div className="shuffle-gesture__card" key={index}>
+                  {Array.from({ length: SHUFFLE_VISUAL_CARDS }).map((_, index) => {
+                    const progress = index / (SHUFFLE_VISUAL_CARDS - 1);
+                    const arc = Math.sin(Math.PI * progress);
+                    const translateX = shuffleDragX * progress + progress * 1.4;
+                    const translateY = -Math.abs(shuffleDragX) * arc * 0.16 - progress * 1.2;
+                    const rotation = shuffleDragX * progress * 0.028;
+                    return (
+                    <div
+                      className="shuffle-gesture__card"
+                      key={index}
+                      style={{
+                        zIndex: index + 1,
+                        transform: `translate3d(${translateX}px, ${translateY}px, 0) rotate(${rotation}deg)`,
+                      }}
+                    >
                       <CardView isBack />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="shuffle-gesture__hint">
                   <span aria-hidden="true">←</span>
@@ -592,6 +608,14 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
                     className={`cut-pile ${cutOrder.includes(index) ? 'is-chosen' : ''}`}
                     type="button"
                     key={index}
+                    style={{
+                      '--cut-merge-x': [
+                        'calc(100% + var(--cut-gap))',
+                        '0px',
+                        'calc(-100% - var(--cut-gap))',
+                      ][index],
+                      '--cut-layer': cutOrder.includes(index) ? cutOrder.indexOf(index) + 2 : 1,
+                    } as React.CSSProperties}
                     disabled={cutOrder.includes(index) || cutOrder.length === 3}
                     onClick={() => selectCutPile(index)}
                   >
