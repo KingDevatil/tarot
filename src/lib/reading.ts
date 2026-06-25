@@ -59,7 +59,7 @@ const buildSummary = (cards: DrawnCard[], focus: string[]) => {
 
 export const createReading = (input: ReadingInput): ReadingResult => {
   const category = getQuestionCategory(input.categoryId);
-  const spread = getSpreadForReading(category.defaultSpread, input.params);
+  const spread = getSpreadForReading(input.spreadId ?? category.defaultSpread, input.params);
   const draws = createDrawDeck(spread.positions.length);
 
   return createReadingFromDraws(input, draws);
@@ -78,7 +78,7 @@ export const createReadingFromDraws = (
   draws: DrawCandidate[],
 ): ReadingResult => {
   const category = getQuestionCategory(input.categoryId);
-  const spread = getSpreadForReading(category.defaultSpread, input.params);
+  const spread = getSpreadForReading(input.spreadId ?? category.defaultSpread, input.params);
   const cards = draws.slice(0, spread.positions.length).map<DrawnCard>((draw, index) => ({
     ...draw,
     position: spread.positions[index],

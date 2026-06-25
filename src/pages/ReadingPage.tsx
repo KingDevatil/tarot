@@ -1,4 +1,4 @@
-import { ChevronLeft, LoaderCircle, RotateCcw, Shuffle, Sparkles, WandSparkles } from 'lucide-react';
+﻿import { ChevronLeft, LoaderCircle, RotateCcw, Shuffle, Sparkles, WandSparkles } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CardView } from '../components/CardView';
@@ -13,9 +13,19 @@ import {
   saveReading,
   type DrawCandidate,
 } from '../lib/reading';
-import type { DrawnCard, ParamKey, QuestionCategory, ReadingResult, Spread, TopicId } from '../types';
+import type {
+  DrawnCard,
+  ParamKey,
+  QuestionCategory,
+  ReadingInput,
+  ReadingResult,
+  Spread,
+  SpreadId,
+  TopicId,
+} from '../types';
 
 interface ReadingPageProps {
+  initialInput?: ReadingInput;
   onComplete: (reading: ReadingResult) => void;
 }
 
@@ -26,13 +36,14 @@ const SHUFFLE_TRANSITION_MS = 680;
 const CUT_TRANSITION_MS = 620;
 const CARD_REVEAL_MS = 720;
 
-export function ReadingPage({ onComplete }: ReadingPageProps) {
-  const [topicId, setTopicId] = useState<TopicId>('daily');
+export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
+  const [topicId, setTopicId] = useState<TopicId>(initialInput?.topicId ?? 'daily');
   const categories = questionCategories.filter((item) => item.topic === topicId);
-  const [categoryId, setCategoryId] = useState(categories[0].id);
+  const [categoryId, setCategoryId] = useState(initialInput?.categoryId ?? categories[0].id);
   const category = questionCategories.find((item) => item.id === categoryId) ?? categories[0];
-  const [params, setParams] = useState<Record<string, string>>({});
-  const [stage, setStage] = useState<RitualStage>('select');
+  const [params, setParams] = useState<Record<string, string>>(initialInput?.params ?? {});
+  const [spreadId, setSpreadId] = useState<SpreadId | undefined>(initialInput?.spreadId);
+  const [stage, setStage] = useState<RitualStage>(initialInput ? 'focus' : 'select');
   const [reading, setReading] = useState<ReadingResult | null>(null);
   const [pickedSlots, setPickedSlots] = useState<number[]>([]);
   const [drawDeck, setDrawDeck] = useState<DrawCandidate[]>([]);
@@ -44,8 +55,12 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   const [revealedCount, setRevealedCount] = useState(0);
   const transitionTimers = useRef<number[]>([]);
   const llmConfig = loadLlmConfig();
-  const [customContexts, setCustomContexts] = useState<Record<string, string>>({});
-  const [generatedQuestions, setGeneratedQuestions] = useState<Record<string, string>>({});
+  const [customContexts, setCustomContexts] = useState<Record<string, string>>(
+    initialInput?.customContext ? { [categoryId]: initialInput.customContext } : {},
+  );
+  const [generatedQuestions, setGeneratedQuestions] = useState<Record<string, string>>(
+    initialInput?.generatedQuestion ? { [categoryId]: initialInput.generatedQuestion } : {},
+  );
   const [questionGeneration, setQuestionGeneration] = useState<{
     categoryId: string;
     status: 'idle' | 'loading' | 'error';
@@ -54,8 +69,8 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
 
   const selectedTopic = topics.find((item) => item.id === topicId) ?? topics[0];
   const SelectedTopicIcon = selectedTopic.icon;
-  const currentSpread = getSpreadForReading(category.defaultSpread, params);
-  const isChoiceComparison = category.defaultSpread === 'choice_compare';
+  const currentSpread = getSpreadForReading(spreadId ?? category.defaultSpread, params);
+  const isChoiceComparison = (spreadId ?? category.defaultSpread) === 'choice_compare';
   const isSpreadTopic = topicId === 'spreads';
 
   const standardQuestion = useMemo(
@@ -73,6 +88,20 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   useEffect(() => () => {
     transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
   }, []);
+
+  useEffect(() => {
+    if (!isDrawCompleteOpen) return undefined;
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, [isDrawCompleteOpen]);
 
   const scheduleTransition = (callback: () => void, delay: number) => {
     const timer = window.setTimeout(() => {
@@ -96,6 +125,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
     const nextCategory = questionCategories.find((item) => item.topic === nextTopicId);
     setTopicId(nextTopicId);
     setCategoryId(nextCategory?.id ?? categoryId);
+    setSpreadId(undefined);
     setParams({});
     setStage('select');
     setReading(null);
@@ -108,6 +138,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   const setCategory = (nextCategoryId: string) => {
     resetRitualAnimation();
     setCategoryId(nextCategoryId);
+    setSpreadId(undefined);
     setParams({});
     setStage('select');
     setReading(null);
@@ -245,6 +276,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
             topicId,
             categoryId,
             params,
+            spreadId: currentSpread.id,
             customContext: customContext.trim() || undefined,
             generatedQuestion: generatedQuestion || undefined,
           },
@@ -278,7 +310,9 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
   const requiredParamKeys = isChoiceComparison
     ? getRequiredChoiceParamKeys(params)
     : category.requiredParams;
-  const allParamsReady = requiredParamKeys.every((key) => params[key]?.trim());
+  const allParamsReady =
+    Boolean(generatedQuestion)
+    || requiredParamKeys.every((key) => params[key]?.trim());
   const hasCustomContext = Boolean(customContext.trim());
   const requiresGeneratedQuestion = llmConfig.enabled && hasCustomContext;
   const isGeneratingQuestion =
@@ -301,6 +335,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
 
       {stage === 'select' ? (
         <div className="reading-layout">
+          <div className="topic-scroll-wrapper">
           <section className="topic-grid" aria-label="主题">
             {topics.map((topic) => {
               const Icon = topic.icon;
@@ -318,6 +353,7 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
               );
             })}
           </section>
+          </div>
 
           <section className="selection-panel">
             <div className="panel-title">
@@ -563,23 +599,25 @@ export function ReadingPage({ onComplete }: ReadingPageProps) {
           {stage === 'reveal' && reading && isDrawCompleteOpen ? (
             <div className="draw-complete-overlay" role="dialog" aria-modal="true" aria-label="抽牌完成">
               <section className="draw-complete-panel">
-                <div className="draw-complete-copy">
-                  <span>{reading.spread.name}</span>
-                  <h2>抽牌完成</h2>
-                  <p>{reading.question}</p>
+                <div className="draw-complete-scroll">
+                  <div className="draw-complete-copy">
+                    <span>{reading.spread.name}</span>
+                    <h2>抽牌完成</h2>
+                    <p>{reading.question}</p>
+                  </div>
+                  <SpreadCardLayout spread={reading.spread} className="draw-complete-cards">
+                    {reading.cards.map((drawn) => (
+                      <article
+                        key={drawn.position.id}
+                        style={drawn.position.layoutArea ? { gridArea: drawn.position.layoutArea } : undefined}
+                      >
+                        <CardView drawn={drawn} />
+                        <span>{drawn.position.label}</span>
+                      </article>
+                    ))}
+                  </SpreadCardLayout>
                 </div>
-                <SpreadCardLayout spread={reading.spread} className="draw-complete-cards">
-                  {reading.cards.map((drawn) => (
-                    <article
-                      key={drawn.position.id}
-                      style={drawn.position.layoutArea ? { gridArea: drawn.position.layoutArea } : undefined}
-                    >
-                      <CardView drawn={drawn} />
-                      <span>{drawn.position.label}</span>
-                    </article>
-                  ))}
-                </SpreadCardLayout>
-                <div className="ritual-actions">
+                <div className="ritual-actions draw-complete-actions">
                   <button className="ghost-button" type="button" onClick={startShuffle}>
                     <RotateCcw size={18} />
                     重新洗牌

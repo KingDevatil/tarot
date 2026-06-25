@@ -104,8 +104,28 @@ export interface ReadingInput {
   topicId: TopicId;
   categoryId: string;
   params: Record<string, string>;
+  spreadId?: SpreadId;
   customContext?: string;
   generatedQuestion?: string;
+}
+
+export interface DivinationFlowRecommendation {
+  id: string;
+  spreadId: SpreadId;
+  title: string;
+  reason: string;
+  detail: string;
+  estimatedMinutes: string;
+}
+
+export interface QuestionAnalysis {
+  topicId: TopicId;
+  categoryId: string;
+  categoryLabel: string;
+  normalizedQuestion: string;
+  params: Record<string, string>;
+  recommendations: DivinationFlowRecommendation[];
+  source: 'llm' | 'local';
 }
 
 export interface ReadingResult {

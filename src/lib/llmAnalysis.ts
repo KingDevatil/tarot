@@ -1,14 +1,19 @@
-import { getQuestionCategory, getTopic } from '../data/questions';
+import { getQuestionCategory, getTopic, questionCategories } from '../data/questions';
+import { getSpread, spreads } from '../data/spreads';
 import { normalizeBaseUrl } from './llmConfig';
 import { getCardMeaning } from './reading';
 import type {
+  DivinationFlowRecommendation,
   DrawnCard,
   LlmAnalysis,
   LlmCardInterpretation,
   LlmConfig,
+  QuestionAnalysis,
   QuestionCategory,
   ReadingResult,
+  SpreadId,
   Topic,
+  TopicId,
 } from '../types';
 
 interface RawLlmAnalysis {
@@ -131,6 +136,237 @@ export const generateLlmQuestion = async (
     throw new LlmAnalysisError('LLM 未返回有效问题，请重试');
   }
   return /[？?]$/.test(question) ? question : `${question}？`;
+};
+
+export const analyzeDivinationQuestion = async (
+  question: string,
+  config: LlmConfig,
+): Promise<QuestionAnalysis> => {
+  const normalizedInput = question.replace(/\s+/g, ' ').trim();
+  if (normalizedInput.length < 4) {
+    throw new LlmAnalysisError('请把问题写得更具体一些，至少输入 4 个字');
+  }
+
+  const fallback = buildLocalQuestionAnalysis(normalizedInput);
+  if (!config.enabled || !config.baseUrl.trim() || !config.model.trim() || !config.apiKey.trim()) {
+    return fallback;
+  }
+
+  try {
+    const result = await requestLlmContent(config, {
+      temperature: Math.min(config.temperature, 0.4),
+      maxTokens: 2048,
+      messages: [
+        {
+          role: 'system',
+          content: [
+            '你是塔罗占卜流程规划助手。',
+            '分析用户问题所属类别，并从给定类别和牌阵中推荐恰好 3 个适合的流程。',
+            '只输出 JSON，不要 Markdown 或解释。',
+            'categoryId 必须来自 allowedCategories；spreadId 必须来自 allowedSpreads。',
+            '第一个推荐应是最合适且复杂度最低的充分方案，后两个提供更深入或不同观察角度。',
+            'normalizedQuestion 使用第一人称，保留用户的具体对象与时间范围，只聚焦一个核心问题。',
+            'params 只填写能从原问题明确推断的字段，不确定时留空。',
+          ].join('\n'),
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            question: normalizedInput,
+            allowedCategories: questionCategories.map((item) => ({
+              id: item.id,
+              topicId: item.topic,
+              label: item.label,
+              defaultSpread: item.defaultSpread,
+            })),
+            allowedSpreads: spreads.map((item) => ({
+              id: item.id,
+              name: item.name,
+              cardCount: item.positions.length,
+              description: item.description,
+              themes: item.themes,
+            })),
+            output: {
+              categoryId: 'allowed category id',
+              normalizedQuestion: 'question',
+              params: {},
+              recommendations: [
+                {
+                  spreadId: 'allowed spread id',
+                  title: 'short title',
+                  reason: 'why this fits the specific question',
+                },
+              ],
+            },
+          }, null, 2),
+        },
+      ],
+    });
+
+    return normalizeQuestionAnalysis(parseLlmJson(result.content), normalizedInput, fallback);
+  } catch {
+    return fallback;
+  }
+};
+
+const normalizeQuestionAnalysis = (
+  raw: RawLlmAnalysis,
+  originalQuestion: string,
+  fallback: QuestionAnalysis,
+): QuestionAnalysis => {
+  const record = raw as Record<string, unknown>;
+  const categoryId = typeof record.categoryId === 'string'
+    && questionCategories.some((item) => item.id === record.categoryId)
+    ? record.categoryId
+    : fallback.categoryId;
+  const category = getQuestionCategory(categoryId);
+  const normalizedQuestion = normalizeText(record.normalizedQuestion, originalQuestion);
+  const rawParams = record.params && typeof record.params === 'object' && !Array.isArray(record.params)
+    ? record.params as Record<string, unknown>
+    : {};
+  const params = Object.fromEntries(
+    Object.entries(rawParams)
+      .filter(([, value]) => typeof value === 'string')
+      .map(([key, value]) => [key, (value as string).trim()]),
+  );
+  const rawRecommendations = Array.isArray(record.recommendations) ? record.recommendations : [];
+  const recommendations = rawRecommendations
+    .map((item, index) => normalizeFlowRecommendation(item, index))
+    .filter((item): item is DivinationFlowRecommendation => Boolean(item))
+    .filter((item, index, items) => items.findIndex((other) => other.spreadId === item.spreadId) === index)
+    .slice(0, 3);
+  const completedRecommendations = [
+    ...recommendations,
+    ...fallback.recommendations.filter(
+      (fallbackItem) => !recommendations.some((item) => item.spreadId === fallbackItem.spreadId),
+    ),
+  ].slice(0, 3);
+
+  return {
+    topicId: category.topic,
+    categoryId,
+    categoryLabel: category.label,
+    normalizedQuestion: /[？?]$/.test(normalizedQuestion) ? normalizedQuestion : `${normalizedQuestion}？`,
+    params: { ...fallback.params, ...params },
+    recommendations: completedRecommendations,
+    source: 'llm',
+  };
+};
+
+const normalizeFlowRecommendation = (
+  value: unknown,
+  index: number,
+): DivinationFlowRecommendation | null => {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const spreadId = record.spreadId;
+  if (typeof spreadId !== 'string' || !spreads.some((item) => item.id === spreadId)) return null;
+  const spread = getSpread(spreadId);
+  return {
+    id: `${spreadId}-${index}`,
+    spreadId: spreadId as SpreadId,
+    title: normalizeText(record.title, spread.name),
+    reason: normalizeText(record.reason, spread.description),
+    detail: `${spread.positions.length} 张牌 · ${spread.description}`,
+    estimatedMinutes: getEstimatedMinutes(spread.positions.length),
+  };
+};
+
+const buildLocalQuestionAnalysis = (question: string): QuestionAnalysis => {
+  const topicId = inferTopic(question);
+  const category = inferCategory(question, topicId);
+  const spreadIds = recommendedSpreadsByTopic[topicId];
+  const params = inferParams(question);
+  return {
+    topicId,
+    categoryId: category.id,
+    categoryLabel: category.label,
+    normalizedQuestion: /[？?]$/.test(question) ? question : `${question}？`,
+    params,
+    recommendations: spreadIds.map((spreadId, index) => {
+      const spread = getSpread(spreadId);
+      return {
+        id: `${spreadId}-${index}`,
+        spreadId,
+        title: spread.name,
+        reason: localRecommendationReason(topicId, spreadId),
+        detail: `${spread.positions.length} 张牌 · ${spread.description}`,
+        estimatedMinutes: getEstimatedMinutes(spread.positions.length),
+      };
+    }),
+    source: 'local',
+  };
+};
+
+const recommendedSpreadsByTopic: Record<TopicId, [SpreadId, SpreadId, SpreadId]> = {
+  daily: ['single', 'three_trend', 'body_mind_spirit'],
+  love: ['relationship_5', 'three_trend', 'celtic_cross_10'],
+  career: ['three_trend', 'horseshoe_7', 'celtic_cross_10'],
+  choice: ['choice_compare', 'three_trend', 'horseshoe_7'],
+  inner: ['body_mind_spirit', 'three_trend', 'single'],
+  trend: ['three_trend', 'horseshoe_7', 'celtic_cross_10'],
+  spreads: ['three_trend', 'horseshoe_7', 'celtic_cross_10'],
+};
+
+const inferTopic = (question: string): TopicId => {
+  if (/(感情|关系|恋爱|暧昧|复合|前任|对方|他|她|伴侣|婚姻)/.test(question)) return 'love';
+  if (/(工作|事业|职场|升职|转岗|项目|学习|考试|学校|offer|面试)/i.test(question)) return 'career';
+  if (/(选择|选哪|要不要|还是|比较|两个|方案)/.test(question)) return 'choice';
+  if (/(情绪|焦虑|内耗|低落|状态|压力|迷茫|自我)/.test(question)) return 'inner';
+  if (/(今天|今日|当天)/.test(question)) return 'daily';
+  return 'trend';
+};
+
+const inferCategory = (question: string, topicId: TopicId) => {
+  const topicCategories = questionCategories.filter((item) => item.topic === topicId);
+  if (topicId === 'love') {
+    if (/(修复|复合|挽回)/.test(question)) return getQuestionCategory('love_repair');
+    if (/(主动|等待|联系)/.test(question)) return getQuestionCategory('love_action');
+    if (/(阻力|问题|卡住|冷淡)/.test(question)) return getQuestionCategory('love_hidden_block');
+  }
+  if (topicId === 'career') {
+    if (/(机会|offer|面试)/i.test(question)) return getQuestionCategory('career_opportunity');
+    if (/(原因|卡住|阻力)/.test(question)) return getQuestionCategory('career_block');
+  }
+  if (topicId === 'inner' && /(恢复|改善|走出|稳定)/.test(question)) {
+    return getQuestionCategory('inner_restore');
+  }
+  if (topicId === 'trend' && /(避免|风险|注意|小心)/.test(question)) {
+    return getQuestionCategory('trend_warning');
+  }
+  return topicCategories[0];
+};
+
+const inferParams = (question: string) => {
+  const params: Record<string, string> = {};
+  if (/(三个月|3个月)/.test(question)) params.timeRange = '三个月内';
+  else if (/(一个月|1个月|本月)/.test(question)) params.timeRange = '一个月内';
+  else if (/(一周|7天|本周)/.test(question)) params.timeRange = '一周内';
+  if (/(暧昧)/.test(question)) params.relationshipStage = '暧昧阶段';
+  else if (/(冷淡|拉扯|断联)/.test(question)) params.relationshipStage = '冷淡拉扯';
+  else if (/(恋爱|伴侣|婚姻|稳定关系)/.test(question)) params.relationshipStage = '稳定关系';
+  if (/(考试|学习)/.test(question)) params.careerFocus = '学习考试';
+  else if (/(升职|转岗|面试|offer)/i.test(question)) params.careerFocus = '升职转岗';
+  else if (/(工作|项目|事业)/.test(question)) params.careerFocus = '当前项目';
+  return params;
+};
+
+const localRecommendationReason = (topicId: TopicId, spreadId: SpreadId) => {
+  if (spreadId === 'single') return '适合先抓住最核心的提醒，快速获得一个明确观察角度。';
+  if (spreadId === 'three_trend') return '用过去、现在与近期趋势看清问题怎样演变，信息量适中。';
+  if (spreadId === 'relationship_5') return '能同时观察双方状态、隐藏阻力、发展趋势与行动建议。';
+  if (spreadId === 'choice_compare') return '把不同选项的收益、代价和最终建议放在同一结构中比较。';
+  if (spreadId === 'body_mind_spirit') return '从现实感受、心理状态和内在需求三个层面整理问题。';
+  if (spreadId === 'horseshoe_7') return `适合${topicId === 'career' ? '推进条件较多的事业问题' : '变量较多的问题'}，补充隐藏因素与外部影响。`;
+  return '适合重要且牵涉因素较多的问题，进行更完整的长期结构分析。';
+};
+
+const getEstimatedMinutes = (cardCount: number) => {
+  if (cardCount <= 1) return '约 2 分钟';
+  if (cardCount <= 3) return '约 4 分钟';
+  if (cardCount <= 5) return '约 6 分钟';
+  if (cardCount <= 7) return '约 8 分钟';
+  return '约 10 分钟';
 };
 
 export const generateLlmAnalysis = async (

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
+import { AmbientMusicControl } from './components/AmbientMusicControl';
 import { NavBar } from './components/NavBar';
 import { loadHistory } from './lib/reading';
 import { HistoryPage } from './pages/HistoryPage';
@@ -7,12 +8,13 @@ import { LibraryPage } from './pages/LibraryPage';
 import { ReadingPage } from './pages/ReadingPage';
 import { ResultPage } from './pages/ResultPage';
 import { SettingsPage } from './pages/SettingsPage';
-import type { AppView, ReadingResult } from './types';
+import type { AppView, ReadingInput, ReadingResult } from './types';
 
 export function App() {
   const [view, setView] = useState<AppView>('home');
   const [history, setHistory] = useState<ReadingResult[]>([]);
   const [activeReading, setActiveReading] = useState<ReadingResult | null>(null);
+  const [preparedReading, setPreparedReading] = useState<ReadingInput | null>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -20,9 +22,18 @@ export function App() {
 
   const navigate = (nextView: AppView) => {
     setView(nextView);
+    if (nextView !== 'reading') {
+      setPreparedReading(null);
+    }
     if (nextView !== 'result') {
       setActiveReading(null);
     }
+  };
+
+  const startPreparedReading = (input: ReadingInput) => {
+    setPreparedReading(input);
+    setActiveReading(null);
+    setView('reading');
   };
 
   const openReading = (reading: ReadingResult) => {
@@ -41,7 +52,15 @@ export function App() {
   }, []);
 
   const renderView = () => {
-    if (view === 'reading') return <ReadingPage onComplete={completeReading} />;
+    if (view === 'reading') {
+      return (
+        <ReadingPage
+          key={preparedReading ? `${preparedReading.generatedQuestion}-${preparedReading.spreadId}` : 'manual'}
+          initialInput={preparedReading ?? undefined}
+          onComplete={completeReading}
+        />
+      );
+    }
     if (view === 'history') {
       return (
         <HistoryPage
@@ -70,6 +89,7 @@ export function App() {
         latest={history[0]}
         onNavigate={navigate}
         onOpenLatest={openReading}
+        onStartReading={startPreparedReading}
       />
     );
   };
@@ -77,6 +97,7 @@ export function App() {
   return (
     <div className="app-shell">
       {renderView()}
+      <AmbientMusicControl />
       <NavBar activeView={view} onNavigate={navigate} />
     </div>
   );
