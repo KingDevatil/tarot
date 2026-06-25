@@ -7,7 +7,7 @@ import {
   isAudioContextReady,
 } from "../lib/ambientAudio";
 
-const STORAGE_KEY = "tarot-ambient-music";
+const STORAGE_KEY = "tarot-ambient-music-v2";
 
 interface StoredPrefs {
   playing: boolean;
@@ -21,11 +21,11 @@ function loadPrefs(): StoredPrefs {
       const obj = JSON.parse(raw);
       return {
         playing: Boolean(obj.playing),
-        volume: typeof obj.volume === "number" ? obj.volume : 0.35,
+        volume: typeof obj.volume === "number" ? obj.volume : 0.7,
       };
     }
   } catch {}
-  return { playing: false, volume: 0.35 };
+  return { playing: false, volume: 0.7 };
 }
 
 function savePrefs(prefs: StoredPrefs) {
@@ -37,7 +37,7 @@ function savePrefs(prefs: StoredPrefs) {
 export function AmbientMusicControl() {
   const prefsRef = useRef(loadPrefs());
   const [playing, setPlaying] = useState(false); // always starts silent
-  const [volume, setVolume] = useState(() => prefsRef.current.volume);
+  const [volume, setVolume] = useState(() => Math.min(prefsRef.current.volume, 1));
   const [supported] = useState(isAudioContextReady);
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
@@ -121,7 +121,7 @@ export function AmbientMusicControl() {
             className="ambient-volume"
             type="range"
             min={0}
-            max={0.6}
+            max={1}
             step={0.02}
             value={volume}
             onChange={onVolume}
