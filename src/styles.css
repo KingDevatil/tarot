@@ -688,6 +688,7 @@ button.tarot-card {
 }
 
 .shuffle-gesture {
+  position: relative;
   display: grid;
   justify-items: center;
   gap: 24px;
@@ -699,8 +700,6 @@ button.tarot-card {
   background:
     radial-gradient(circle at 50% 38%, rgba(244, 213, 141, 0.1), transparent 46%),
     rgba(0, 0, 0, 0.16);
-  cursor: grab;
-  touch-action: none;
   user-select: none;
   outline: none;
 }
@@ -710,15 +709,17 @@ button.tarot-card {
   box-shadow: 0 0 0 4px rgba(244, 213, 141, 0.08);
 }
 
-.shuffle-gesture:active {
-  cursor: grabbing;
-}
-
 .shuffle-gesture__deck {
   position: relative;
   width: 150px;
   aspect-ratio: 4 / 7;
   isolation: isolate;
+  touch-action: none;
+  cursor: grab;
+}
+
+.shuffle-gesture__deck:active {
+  cursor: grabbing;
 }
 
 .shuffle-gesture__card {
@@ -736,9 +737,8 @@ button.tarot-card {
   isolation: isolate;
 }
 
-.shuffle-gesture:not(.is-resolving) .shuffle-gesture__card {
-  transition-duration: 45ms;
-  transition-timing-function: linear;
+.shuffle-gesture.is-dragging .shuffle-gesture__card {
+  transition: none;
 }
 
 .shuffle-gesture__hint {

@@ -30,12 +30,17 @@ interface ReadingPageProps {
 }
 
 type RitualStage = 'select' | 'focus' | 'shuffle' | 'cut' | 'draw' | 'reveal';
+type DragPoint = { x: number; y: number };
 
 const SHUFFLE_ROUNDS = 3;
 const SHUFFLE_TRANSITION_MS = 680;
 const CUT_TRANSITION_MS = 1500;
 const CARD_REVEAL_MS = 720;
 const SHUFFLE_VISUAL_CARDS = 9;
+const TRAIL_MAX = 120;
+const STEP_PX = 10;
+const CARD_DELAY_PX = 50;
+const MAX_CARD_ROTATION = 18;
 
 export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
   const isFreeformReading = initialInput?.questionSource === 'freeform';
@@ -58,9 +63,14 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
   const [shuffleRound, setShuffleRound] = useState(0);
   const [cutOrder, setCutOrder] = useState<number[]>([]);
   const [revealedCount, setRevealedCount] = useState(0);
-  const [shuffleDragX, setShuffleDragX] = useState(0);
+  const [isShuffleDragging, setIsShuffleDragging] = useState(false);
+  const trailRef = useRef<DragPoint[]>([]);
+  const currentPointerRef = useRef<DragPoint>({ x: 0, y: 0 });
+  const rafIdRef = useRef(0);
+  const settleRafRef = useRef(0);
+  const [, forceDragRender] = useState(0);
   const transitionTimers = useRef<number[]>([]);
-  const shuffleStartX = useRef<number | null>(null);
+  const cleanupShuffleGesture = useRef<(() => void) | null>(null);
   const drawReadyRef = useRef<HTMLDivElement | null>(null);
   const llmConfig = loadLlmConfig();
   const [customContexts, setCustomContexts] = useState<Record<string, string>>(
@@ -99,6 +109,10 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
 
   useEffect(() => () => {
     transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
+    cancelAnimationFrame(rafIdRef.current);
+    rafIdRef.current = 0;
+    if (settleRafRef.current) { cancelAnimationFrame(settleRafRef.current); settleRafRef.current = 0; }
+    cleanupShuffleGesture.current?.();
   }, []);
 
   useEffect(() => {
@@ -124,11 +138,17 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
   };
 
   const resetRitualAnimation = () => {
+    cancelAnimationFrame(rafIdRef.current);
+    rafIdRef.current = 0;
+    cancelSettle();
+    cleanupShuffleGesture.current?.();
     transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
     transitionTimers.current = [];
     setSelectedShuffleCard(null);
     setShuffleRound(0);
-    setShuffleDragX(0);
+    trailRef.current = [];
+    currentPointerRef.current = { x: 0, y: 0 };
+    setIsShuffleDragging(false);
     setCutOrder([]);
     setRevealedCount(0);
   };
@@ -234,47 +254,132 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
     setStage('shuffle');
   };
 
-  const completeShuffleGesture = (direction: number) => {
+  const scheduleRender = () => {
+    if (rafIdRef.current) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = 0;
+      forceDragRender((n) => n + 1);
+    });
+  };
+
+  const interpolateTrail = (trail: DragPoint[], x: number, y: number, step: number) => {
+    const prev = trail[trail.length - 1];
+    const dx = x - prev.x;
+    const dy = y - prev.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < step) return;
+    const count = Math.floor(dist / step);
+    for (let k = 1; k <= count; k++) {
+      const t = (k * step) / dist;
+      trail.push({ x: prev.x + dx * t, y: prev.y + dy * t });
+    }
+    while (trail.length > TRAIL_MAX) trail.shift();
+  };
+
+  const settleTrail = () => {
+    trailRef.current = [];
+    currentPointerRef.current = { x: 0, y: 0 };
+    forceDragRender((n) => n + 1);
+  };
+
+  const cancelSettle = () => {
+    if (settleRafRef.current) { cancelAnimationFrame(settleRafRef.current); settleRafRef.current = 0; }
+  };
+
+  const scheduleSettle = () => {
+    cancelSettle();
+    settleRafRef.current = requestAnimationFrame(() => {
+      settleRafRef.current = requestAnimationFrame(() => {
+        settleRafRef.current = 0;
+        settleTrail();
+      });
+    });
+  };
+
+  const finishShuffleRound = () => {
+    setSelectedShuffleCard(null);
+    setIsShuffleDragging(false);
+    const nextRound = shuffleRound + 1;
+    setShuffleRound(nextRound);
+    if (nextRound >= SHUFFLE_ROUNDS) {
+      setCutOrder([]);
+      setStage('cut');
+    }
+  };
+
+  const completeShuffleGesture = (direction: number, distance: number) => {
     if (selectedShuffleCard !== null) return;
-    if (Math.abs(shuffleDragX) < 70) {
-      setShuffleDragX(direction * 140);
+    if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = 0; }
+    setIsShuffleDragging(false);
+    if (distance < 70) {
+      scheduleSettle();
+      return;
     }
     setSelectedShuffleCard(direction);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setShuffleDragX(0));
-    });
-    scheduleTransition(() => {
-      setSelectedShuffleCard(null);
-      const nextRound = shuffleRound + 1;
-      setShuffleRound(nextRound);
-      if (nextRound >= SHUFFLE_ROUNDS) {
-        setCutOrder([]);
-        setStage('cut');
-      }
-    }, SHUFFLE_TRANSITION_MS);
+    scheduleSettle();
+    scheduleTransition(finishShuffleRound, SHUFFLE_TRANSITION_MS);
   };
 
   const beginShuffleGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (selectedShuffleCard !== null) return;
-    shuffleStartX.current = event.clientX;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
+    cancelSettle();
+    const pointerId = event.pointerId;
+    const target = event.currentTarget;
+    const ownerWindow = target.ownerDocument.defaultView ?? window;
+    target.setPointerCapture(pointerId);
 
-  const moveShuffleGesture = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (shuffleStartX.current === null || selectedShuffleCard !== null) return;
-    const distance = Math.max(-150, Math.min(150, event.clientX - shuffleStartX.current));
-    setShuffleDragX(distance);
-  };
+    const sx = event.clientX;
+    const sy = event.clientY;
+    trailRef.current = [{ x: 0, y: 0 }];
+    currentPointerRef.current = { x: 0, y: 0 };
+    setIsShuffleDragging(true);
+    forceDragRender((n) => n + 1);
 
-  const endShuffleGesture = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (shuffleStartX.current === null || selectedShuffleCard !== null) return;
-    const distance = event.clientX - shuffleStartX.current;
-    shuffleStartX.current = null;
-    if (Math.abs(distance) >= 70) {
-      completeShuffleGesture(distance > 0 ? 1 : -1);
-    } else {
-      setShuffleDragX(0);
-    }
+    const handlePointerMove = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      const dx = pointerEvent.clientX - sx;
+      const dy = pointerEvent.clientY - sy;
+      currentPointerRef.current = { x: dx, y: dy };
+      interpolateTrail(trailRef.current, dx, dy, STEP_PX);
+      scheduleRender();
+    };
+
+    const cleanup = () => {
+      ownerWindow.removeEventListener('pointermove', handlePointerMove);
+      ownerWindow.removeEventListener('pointerup', handlePointerUp);
+      ownerWindow.removeEventListener('pointercancel', handlePointerCancel);
+      if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
+      cleanupShuffleGesture.current = null;
+    };
+
+    const handlePointerUp = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      const dx = pointerEvent.clientX - sx;
+      const dy = pointerEvent.clientY - sy;
+      currentPointerRef.current = { x: dx, y: dy };
+      interpolateTrail(trailRef.current, dx, dy, STEP_PX);
+      const distance = Math.hypot(dx, dy);
+      const direction = dx !== 0 ? Math.sign(dx) : Math.sign(dy) || 1;
+      cleanup();
+      completeShuffleGesture(direction, distance);
+    };
+
+    const handlePointerCancel = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      cleanup();
+      if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = 0; }
+      cancelSettle();
+      trailRef.current = [];
+      currentPointerRef.current = { x: 0, y: 0 };
+      setIsShuffleDragging(false);
+      forceDragRender((n) => n + 1);
+    };
+
+    cleanupShuffleGesture.current?.();
+    cleanupShuffleGesture.current = cleanup;
+    ownerWindow.addEventListener('pointermove', handlePointerMove);
+    ownerWindow.addEventListener('pointerup', handlePointerUp);
+    ownerWindow.addEventListener('pointercancel', handlePointerCancel);
   };
 
   const selectCutPile = (index: number) => {
@@ -571,35 +676,60 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
                 ))}
               </div>
               <div
-                className={`shuffle-gesture ${selectedShuffleCard !== null ? 'is-resolving' : ''}`}
+                className={`shuffle-gesture ${isShuffleDragging ? 'is-dragging' : ''} ${selectedShuffleCard !== null ? 'is-resolving' : ''}`}
                 role="button"
                 tabIndex={0}
-                aria-label={`左右划动牌堆完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} 次洗牌`}
-                onPointerDown={beginShuffleGesture}
-                onPointerMove={moveShuffleGesture}
-                onPointerUp={endShuffleGesture}
-                onPointerCancel={endShuffleGesture}
+                aria-label={`自由拖动牌堆完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} 次洗牌`}
                 onKeyDown={(event) => {
-                  if (event.key === 'ArrowLeft') completeShuffleGesture(-1);
-                  if (event.key === 'ArrowRight') completeShuffleGesture(1);
+                  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                    const dir = event.key === 'ArrowLeft' ? -1 : 1;
+                    const synth: DragPoint[] = [];
+                    const waveLen = CARD_DELAY_PX * (SHUFFLE_VISUAL_CARDS - 1);
+                    const steps = Math.ceil(waveLen / STEP_PX);
+                    for (let k = 0; k <= steps; k++) {
+                      synth.push({ x: dir * k * STEP_PX, y: Math.sin(k * 0.25) * 12 });
+                    }
+                    trailRef.current = synth;
+                    currentPointerRef.current = synth[synth.length - 1];
+                    setIsShuffleDragging(true);
+                    forceDragRender((n) => n + 1);
+                    rafIdRef.current = requestAnimationFrame(() => {
+                      rafIdRef.current = 0;
+                      completeShuffleGesture(dir, 140);
+                    });
+                  }
                 }}
               >
-                <div
-                  className="shuffle-gesture__deck"
-                >
+                <div className="shuffle-gesture__deck" onPointerDown={beginShuffleGesture}>
                   {Array.from({ length: SHUFFLE_VISUAL_CARDS }).map((_, index) => {
-                    const progress = index / (SHUFFLE_VISUAL_CARDS - 1);
-                    const arc = Math.sin(Math.PI * progress);
-                    const translateX = shuffleDragX * progress + progress * 1.4;
-                    const translateY = -Math.abs(shuffleDragX) * arc * 0.16 - progress * 1.2;
-                    const rotation = shuffleDragX * progress * 0.028;
+                    const trail = trailRef.current;
+                    const current = currentPointerRef.current;
+                    const fromTop = SHUFFLE_VISUAL_CARDS - 1 - index;
+                    const delaySteps = Math.round(fromTop * CARD_DELAY_PX / STEP_PX);
+                    let pt: DragPoint;
+                    let ahead: DragPoint;
+                    if (fromTop === 0) {
+                      pt = current;
+                      ahead = trail.length > 0 ? trail[trail.length - 1] : current;
+                    } else {
+                      const trailIdx = Math.max(0, trail.length - 1 - delaySteps);
+                      pt = trail.length > 0 ? trail[trailIdx] : { x: 0, y: 0 };
+                      const aheadIdx = Math.min(trailIdx + 1, trail.length - 1);
+                      ahead = trail.length > 0 ? trail[aheadIdx] : { x: 0, y: 0 };
+                    }
+                    const dx = fromTop === 0 ? pt.x - ahead.x : ahead.x - pt.x;
+                    const dy = fromTop === 0 ? pt.y - ahead.y : ahead.y - pt.y;
+                    const tangentDeg = (fromTop === 0 ? trail.length > 0 : trail.length > 1)
+                      ? Math.atan2(dy, dx) * (180 / Math.PI)
+                      : 0;
+                    const rotation = Math.max(-MAX_CARD_ROTATION, Math.min(MAX_CARD_ROTATION, tangentDeg * 0.35));
                     return (
                     <div
                       className="shuffle-gesture__card"
                       key={index}
                       style={{
                         zIndex: index + 1,
-                        transform: `translate3d(${translateX}px, ${translateY}px, 0) rotate(${rotation}deg)`,
+                        transform: `translate3d(${pt.x}px, ${pt.y}px, 0) rotate(${rotation}deg)`,
                       }}
                     >
                       <CardView isBack />
@@ -609,14 +739,13 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
                 </div>
                 <div className="shuffle-gesture__hint">
                   <span aria-hidden="true">←</span>
-                  <strong>用手指缓慢划动牌堆</strong>
+                  <strong>按住并自由拖动牌堆</strong>
                   <span aria-hidden="true">→</span>
                   <small>跟随呼吸，让牌在手中重新排列</small>
                 </div>
               </div>
             </>
           ) : null}
-
           {stage === 'cut' ? (
             <div className="cut-ritual">
               <p>不要计算顺序。依直觉依次触碰三叠牌，它们会按照你的选择重新合为一体。</p>
@@ -759,7 +888,7 @@ function ritualDescription(
   revealedCount: number,
 ) {
   if (stage === 'focus') return '先确认问题，再进入洗牌、切牌、抽牌和翻牌。';
-  if (stage === 'shuffle') return `左右划动牌堆，完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} / ${SHUFFLE_ROUNDS} 次洗牌。`;
+  if (stage === 'shuffle') return `自由拖动牌堆，完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} / ${SHUFFLE_ROUNDS} 次洗牌。`;
   if (stage === 'cut') return `按你希望重新合牌的顺序选择三叠牌。已选择 ${cutCount} / 3。`;
   if (stage === 'reveal') return `按照牌阵位置依次翻开。已翻开 ${revealedCount} / ${totalCards} 张。`;
   return `${question} 已抽取 ${pickedCount} / ${totalCards} 张。`;

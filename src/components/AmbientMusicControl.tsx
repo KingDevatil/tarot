@@ -39,6 +39,9 @@ export function AmbientMusicControl() {
   const [playing, setPlaying] = useState(false); // always starts silent
   const [volume, setVolume] = useState(() => prefsRef.current.volume);
   const [supported] = useState(isAudioContextReady);
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+  const mountedRef = useRef(true);
 
   // Save preferences whenever they change
   useEffect(() => {
@@ -56,18 +59,38 @@ export function AmbientMusicControl() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [playing, volume]);
 
-  // Cleanup on unmount
-  useEffect(() => () => stopAmbient(), []);
+  // Cleanup on unmount, including an AudioContext that finishes resuming late.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stopAmbient();
+    };
+  }, []);
 
   if (!supported) return null;
 
-  const toggle = () => {
+  const toggle = async () => {
     if (playing) {
       stopAmbient();
       setPlaying(false);
-    } else {
-      const ok = startAmbient(volume);
+      return;
+    }
+    // Guard against double-click while AudioContext is resuming
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStarting(true);
+    try {
+      const ok = await startAmbient(volume);
+      if (!mountedRef.current) {
+        if (ok) stopAmbient();
+        return;
+      }
       if (ok) setPlaying(true);
+      // On failure: keep playing=false, user sees no false-positive state
+    } finally {
+      startingRef.current = false;
+      if (mountedRef.current) setStarting(false);
     }
   };
 
@@ -83,8 +106,10 @@ export function AmbientMusicControl() {
         className="ambient-toggle"
         type="button"
         onClick={toggle}
-        aria-label={playing ? "暂停背景音乐" : "播放背景音乐"}
+        disabled={starting}
         aria-pressed={playing}
+        aria-busy={starting || undefined}
+        aria-label={playing ? "暂停背景音乐" : "播放背景音乐"}
         title={playing ? "暂停" : "播放背景音乐"}
       >
         {playing ? <Music size={15} /> : <Music2 size={15} />}
