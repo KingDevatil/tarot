@@ -3097,7 +3097,7 @@ button.tarot-card {
   }
 
   .ritual-panel::after {
-    inset: 88px 16px 76px;
+    inset: 88px 16px 32px;
   }
 
   .ritual-back-button {
@@ -3204,6 +3204,7 @@ button.tarot-card {
     grid-template-columns: 1fr;
     place-items: center;
     width: min(100% - 42px, 520px);
+    margin-bottom: clamp(26px, 5vh, 56px);
     justify-items: center;
     text-align: center;
   }
