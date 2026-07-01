@@ -1380,6 +1380,7 @@ button.tarot-card {
 .table-complete-actions .ritual-actions {
   flex: 0 0 auto;
   margin: 0;
+  justify-content: center;
 }
 
 .result-summary {
@@ -1467,7 +1468,8 @@ button.tarot-card {
 }
 
 .advice-panel > .primary-button {
-  justify-self: start;
+  display: flex;
+  width: fit-content;
   margin-top: 18px;
 }
 
@@ -1922,8 +1924,8 @@ button.tarot-card {
   left: 50%;
   bottom: 16px;
   z-index: 20;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  justify-content: center;
   gap: 6px;
   width: min(640px, calc(100vw - 32px));
   padding: 8px;
@@ -1936,6 +1938,8 @@ button.tarot-card {
 
 .bottom-nav button {
   display: flex;
+  flex: 1 1 0;
+  min-width: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -3196,8 +3200,20 @@ button.tarot-card {
   }
 
   .table-complete-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    place-items: center;
     width: min(100% - 42px, 520px);
     justify-items: center;
+    text-align: center;
+  }
+
+  .table-complete-actions > div:first-child {
+    display: grid;
+    place-items: center;
+    justify-self: stretch;
+    justify-items: center;
+    width: 100%;
     text-align: center;
   }
 
@@ -3209,6 +3225,27 @@ button.tarot-card {
   .table-complete-actions p {
     max-width: 100%;
     font-size: 13px;
+  }
+
+  .table-complete-actions .ritual-actions {
+    display: flex;
+    justify-content: center;
+    justify-items: center;
+    width: 100%;
+  }
+
+  .table-complete-actions button,
+  .advice-panel > .primary-button {
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  .advice-panel {
+    text-align: center;
+  }
+
+  .advice-list {
+    text-align: left;
   }
 
   .bottom-nav {
