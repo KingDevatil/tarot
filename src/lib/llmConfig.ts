@@ -1,4 +1,5 @@
 import type { LlmConfig, LlmProvider } from '../types';
+import { isBilibiliVariant } from './appVariant';
 
 const LLM_CONFIG_KEY = 'tarot_llm_config_v1';
 
@@ -40,11 +41,29 @@ export const defaultLlmConfig: LlmConfig = {
   timeoutMs: 30000,
 };
 
+export const bilibiliLlmConfig: LlmConfig = {
+  enabled: true,
+  thinkingEnabled: false,
+  provider: 'openai_compatible',
+  baseUrl: '/api/bxk/private_chat',
+  model: 'bxk-private-chat-1114',
+  apiKey: 'builtin',
+  providerApiKeys: {},
+  temperature: 0.7,
+  timeoutMs: 30000,
+  privateChat: {
+    endpoint: '/api/bxk/private_chat',
+    kid: '1114',
+    chatMod: 'bot',
+  },
+};
+
 interface StoredLlmConfig extends Partial<LlmConfig> {
   endpoint?: string;
 }
 
 export const loadLlmConfig = (): LlmConfig => {
+  if (isBilibiliVariant) return bilibiliLlmConfig;
   try {
     const raw = localStorage.getItem(LLM_CONFIG_KEY);
     if (!raw) return defaultLlmConfig;
@@ -70,6 +89,7 @@ export const loadLlmConfig = (): LlmConfig => {
 };
 
 export const saveLlmConfig = (config: LlmConfig) => {
+  if (isBilibiliVariant) return;
   const providerApiKeys = {
     ...config.providerApiKeys,
     [config.provider]: config.apiKey,
@@ -82,7 +102,11 @@ export const saveLlmConfig = (config: LlmConfig) => {
 };
 
 export const isLlmConfigUsable = (config: LlmConfig) =>
-  config.enabled && config.baseUrl.trim() && config.model.trim() && config.apiKey.trim();
+  config.enabled
+  && (
+    Boolean(config.privateChat?.endpoint && config.privateChat.kid)
+    || Boolean(config.baseUrl.trim() && config.model.trim() && config.apiKey.trim())
+  );
 
 export const applyLlmProviderPreset = (config: LlmConfig, provider: LlmProvider): LlmConfig => ({
   ...config,

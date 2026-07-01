@@ -466,6 +466,10 @@ const requestLlmContent = async (
     signal?: AbortSignal;
   },
 ): Promise<{ content: string; finishReason: string }> => {
+  if (config.privateChat) {
+    return requestPrivateChatContent(config, request);
+  }
+
   const timeoutController = new AbortController();
   const timeout = window.setTimeout(() => timeoutController.abort(), config.timeoutMs);
 
@@ -549,6 +553,95 @@ const requestLlmContent = async (
     window.clearTimeout(timeout);
     timeoutController.abort();
   }
+};
+
+const requestPrivateChatContent = async (
+  config: LlmConfig,
+  request: {
+    messages: Array<{ role: 'system' | 'user'; content: string }>;
+    signal?: AbortSignal;
+  },
+): Promise<{ content: string; finishReason: string }> => {
+  const privateChat = config.privateChat;
+  if (!privateChat?.endpoint || !privateChat.kid) {
+    throw new LlmAnalysisError('私有聊天接口配置不完整');
+  }
+
+  const timeoutController = new AbortController();
+  const timeout = window.setTimeout(() => timeoutController.abort(), config.timeoutMs);
+  const signals = [timeoutController.signal];
+  if (request.signal) signals.push(request.signal);
+  const signal = typeof AbortSignal.any === 'function'
+    ? AbortSignal.any(signals)
+    : (() => {
+        const merged = new AbortController();
+        for (const s of signals) {
+          if (s.aborted) { merged.abort(s.reason); break; }
+          s.addEventListener('abort', () => merged.abort(s.reason), { once: true });
+        }
+        return merged.signal;
+      })();
+
+  try {
+    const response = await fetch(privateChat.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kid: privateChat.kid,
+        query: buildPrivateChatQuery(request.messages),
+        chat_mod: privateChat.chatMod || 'bot',
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      console.error('[LLM] private_chat HTTP error', response.status);
+      throw new LlmAnalysisError('请求LLM服务失败，请稍后重试');
+    }
+
+    const payload = await response.json();
+    const content = extractPrivateChatContent(payload);
+    if (!content) {
+      throw new LlmAnalysisError('LLM 返回中没有可显示的解析内容');
+    }
+    return { content, finishReason: 'stop' };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      if (request.signal?.aborted) throw error;
+      throw new LlmAnalysisError(`LLM 请求超过 ${Math.round(config.timeoutMs / 1000)} 秒未返回，已回退到本地解析`);
+    }
+    if (error instanceof LlmAnalysisError) throw error;
+    throw new LlmAnalysisError('LLM 解析不可用，可能是网络、跨域或接口配置问题');
+  } finally {
+    window.clearTimeout(timeout);
+    timeoutController.abort();
+  }
+};
+
+const buildPrivateChatQuery = (messages: Array<{ role: 'system' | 'user'; content: string }>) =>
+  messages
+    .map((message) => `${message.role === 'system' ? '系统要求' : '用户内容'}：\n${message.content}`)
+    .join('\n\n');
+
+const extractPrivateChatContent = (payload: unknown): string => {
+  if (typeof payload === 'string') return payload.trim();
+  if (!payload || typeof payload !== 'object') return '';
+  const data = payload as {
+    answer?: unknown;
+    message?: unknown;
+    content?: unknown;
+    data?: {
+      answer?: unknown;
+      message?: unknown;
+      content?: unknown;
+    };
+  };
+  return normalizeContentPart(data.data?.answer)
+    || normalizeContentPart(data.answer)
+    || normalizeContentPart(data.data?.message)
+    || normalizeContentPart(data.message)
+    || normalizeContentPart(data.data?.content)
+    || normalizeContentPart(data.content);
 };
 
 const buildChatCompletionsUrl = (baseUrl: string) => `${normalizeBaseUrl(baseUrl)}/chat/completions`;

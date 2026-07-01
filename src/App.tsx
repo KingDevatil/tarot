@@ -2,6 +2,7 @@
 import { Sparkles } from 'lucide-react';
 import { AmbientMusicControl } from './components/AmbientMusicControl';
 import { NavBar } from './components/NavBar';
+import { isBilibiliVariant } from './lib/appVariant';
 import { loadHistory } from './lib/reading';
 import { HistoryPage } from './pages/HistoryPage';
 import { HomePage } from './pages/HomePage';
@@ -22,6 +23,10 @@ export function App() {
   }, []);
 
   const navigate = (nextView: AppView) => {
+    if (isBilibiliVariant && nextView === 'settings') {
+      setView('home');
+      return;
+    }
     setView(nextView);
     if (nextView !== 'reading') {
       setPreparedReading(null);
@@ -78,7 +83,7 @@ export function App() {
       );
     }
     if (view === 'library') return <LibraryPage />;
-    if (view === 'settings') return <SettingsPage />;
+    if (view === 'settings' && !isBilibiliVariant) return <SettingsPage />;
     if (view === 'result' && activeReading) {
       return (
         <ResultPage

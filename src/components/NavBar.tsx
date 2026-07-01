@@ -1,4 +1,5 @@
 import { BookOpen, History, Home, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { isBilibiliVariant } from '../lib/appVariant';
 import type { AppView } from '../types';
 
 interface NavBarProps {
@@ -7,13 +8,15 @@ interface NavBarProps {
 }
 
 export function NavBar({ activeView, onNavigate }: NavBarProps) {
-  const items: Array<{ view: AppView; label: string; icon: typeof Home }> = [
+  const coreItems: Array<{ view: AppView; label: string; icon: typeof Home }> = [
     { view: 'home', label: '首页', icon: Home },
     { view: 'reading', label: '占卜', icon: Sparkles },
     { view: 'history', label: '历史', icon: History },
     { view: 'library', label: '牌库', icon: BookOpen },
-    { view: 'settings', label: '配置', icon: SlidersHorizontal },
   ];
+  const items = isBilibiliVariant
+    ? coreItems
+    : [...coreItems, { view: 'settings' as const, label: '配置', icon: SlidersHorizontal }];
 
   return (
     <nav className="bottom-nav" aria-label="主导航">
