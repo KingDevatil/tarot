@@ -640,12 +640,12 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
               <span className="focus-ritual__symbol" aria-hidden="true">✦</span>
               <p>{question}</p>
               <ol>
-                <li>确认本次只围绕这一个问题抽牌</li>
-                <li>安静呼吸，将注意力放在问题的具体对象上</li>
-                <li>准备好后再开始洗牌</li>
+                <li>只围绕这个问题</li>
+                <li>安静呼吸</li>
+                <li>准备好后洗牌</li>
               </ol>
               <button className="primary-button" type="button" onClick={startShuffle}>
-                我已专注问题，开始洗牌
+                开始洗牌
               </button>
             </div>
           ) : null}
@@ -721,9 +721,9 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
                 </div>
                 <div className="shuffle-gesture__hint">
                   <span aria-hidden="true">←</span>
-                  <strong>按住并自由拖动牌堆</strong>
+                  <strong>按住拖动牌堆</strong>
                   <span aria-hidden="true">→</span>
-                  <small>跟随呼吸，让牌在手中重新排列</small>
+                  <small>完成三次洗牌</small>
                 </div>
               </div>
             </>
@@ -765,7 +765,7 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
                 <div className="draw-ready" ref={drawReadyRef}>
                   <span className="draw-ready__symbol" aria-hidden="true">✦</span>
                   <strong>{currentSpread.positions.length} 张牌已选定</strong>
-                  <p>牌面仍然保持隐藏。准备好后，让它们依次回应你的问题。</p>
+                  <p>准备好后依次翻开。</p>
                   <button className="primary-button reveal-button" type="button" onClick={startReveal}>
                     <Sparkles size={18} />
                     开始揭牌
@@ -850,7 +850,7 @@ function ritualDescription(
   cutCount: number,
   revealedCount: number,
 ) {
-  if (stage === 'focus') return '先确认问题，再进入洗牌、切牌、抽牌和翻牌。';
+  if (stage === 'focus') return '确认后进入洗牌、切牌和抽牌。';
   if (stage === 'shuffle') return `自由拖动牌堆，完成第 ${Math.min(shuffleRound + 1, SHUFFLE_ROUNDS)} / ${SHUFFLE_ROUNDS} 次洗牌。`;
   if (stage === 'cut') return `按你希望重新合牌的顺序选择三叠牌。已选择 ${cutCount} / 3。`;
   if (stage === 'reveal') return `按照牌阵位置依次翻开。已翻开 ${revealedCount} / ${totalCards} 张。`;
@@ -869,14 +869,14 @@ function pageTitle(stage: RitualStage) {
 function pageDescription(stage: RitualStage, llmEnabled: boolean) {
   if (stage === 'select') {
     return llmEnabled
-      ? '选择类别和参数后，可以补充具体情况，由 LLM 整理为清晰的占卜问题。'
-      : '问题由类别和参数生成；开启 LLM 后，可以补充具体情况并生成定制问题。';
+      ? '选择类别，补充情况。'
+      : '选择类别，生成问题。';
   }
-  if (stage === 'focus') return '静心确认本次占卜只回应一个明确问题。';
-  if (stage === 'shuffle') return '用手指划动整叠牌，让动作、呼吸与问题慢慢同步。';
-  if (stage === 'cut') return '将牌分为三叠，并按选择顺序重新合牌。';
-  if (stage === 'reveal') return '全部选牌完成后，按牌位顺序统一揭示牌面。';
-  return '从牌背中选出牌阵需要的牌；选牌阶段不提前查看牌面。';
+  if (stage === 'focus') return '确认一个明确问题。';
+  if (stage === 'shuffle') return '拖动牌堆完成洗牌。';
+  if (stage === 'cut') return '选择三叠牌的合牌顺序。';
+  if (stage === 'reveal') return '按牌位翻开牌面。';
+  return '从牌背中选出所需牌。';
 }
 
 interface SpreadOptionProps {
