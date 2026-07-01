@@ -62,10 +62,26 @@ export function HomePage({
 
   const beginReading = () => {
     if (!analysis) return;
-    const selected = analysis.recommendations.find((item) => item.id === selectedFlowId);
+    const selected = flowOptions.find((item) => item.id === selectedFlowId);
     if (!selected) return;
     onStartReading(createFreeformReadingInput(question, analysis, selected.spreadId));
   };
+
+  const flowOptions = analysis
+    ? analysis.recommendations.some((item) => item.spreadId === 'single')
+      ? analysis.recommendations
+      : [
+          {
+            id: 'single-card-quick',
+            spreadId: 'single' as const,
+            title: '一张牌快速占卜',
+            reason: '用一张牌先抓住问题的核心提醒，适合想快速获得一个观察角度的时候。',
+            detail: '1 张牌 · 适合快速指引',
+            estimatedMinutes: '约 2 分钟',
+          },
+          ...analysis.recommendations,
+        ]
+    : [];
 
   return (
     <main className="screen home-search-screen">
@@ -143,7 +159,7 @@ export function HomePage({
                 {analysis.categoryLabel}
                 <span>{analysis.source === 'llm' ? 'LLM 分析' : '智能匹配'}</span>
               </p>
-              <h2>为你推荐 3 种占卜方式</h2>
+              <h2>选择占卜方式</h2>
               <blockquote>
                 <strong>意图摘要（仅用于匹配）：</strong>
                 {analysis.normalizedQuestion}
@@ -156,7 +172,7 @@ export function HomePage({
           </div>
 
           <div className="flow-option-list" role="radiogroup" aria-label="占卜方式">
-            {analysis.recommendations.map((flow, index) => {
+            {flowOptions.map((flow, index) => {
               const spread = getSpread(flow.spreadId);
               const isSelected = flow.id === selectedFlowId;
               return (

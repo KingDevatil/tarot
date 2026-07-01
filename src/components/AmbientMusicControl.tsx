@@ -25,7 +25,7 @@ function loadPrefs(): StoredPrefs {
       };
     }
   } catch {}
-  return { playing: false, volume: 0.7 };
+  return { playing: true, volume: 0.7 };
 }
 
 function savePrefs(prefs: StoredPrefs) {
@@ -36,7 +36,8 @@ function savePrefs(prefs: StoredPrefs) {
 
 export function AmbientMusicControl() {
   const prefsRef = useRef(loadPrefs());
-  const [playing, setPlaying] = useState(false); // always starts silent
+  const [playing, setPlaying] = useState(false);
+  const [wantsPlayback, setWantsPlayback] = useState(prefsRef.current.playing);
   const [volume, setVolume] = useState(() => Math.min(prefsRef.current.volume, 1));
   const [supported] = useState(isAudioContextReady);
   const [starting, setStarting] = useState(false);
@@ -45,8 +46,40 @@ export function AmbientMusicControl() {
 
   // Save preferences whenever they change
   useEffect(() => {
-    savePrefs({ playing, volume });
-  }, [playing, volume]);
+    savePrefs({ playing: wantsPlayback, volume });
+  }, [wantsPlayback, volume]);
+
+  useEffect(() => {
+    if (!supported || !wantsPlayback || playing || startingRef.current) return;
+
+    let cancelled = false;
+    const beginPlayback = async () => {
+      if (startingRef.current || cancelled) return;
+      startingRef.current = true;
+      setStarting(true);
+      try {
+        const ok = await startAmbient(volume);
+        if (!mountedRef.current || cancelled) {
+          if (ok) stopAmbient();
+          return;
+        }
+        if (ok) setPlaying(true);
+      } finally {
+        startingRef.current = false;
+        if (mountedRef.current && !cancelled) setStarting(false);
+      }
+    };
+
+    void beginPlayback();
+    window.addEventListener("pointerdown", beginPlayback, { once: true, passive: true });
+    window.addEventListener("keydown", beginPlayback, { once: true });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pointerdown", beginPlayback);
+      window.removeEventListener("keydown", beginPlayback);
+    };
+  }, [playing, supported, volume, wantsPlayback]);
 
   // Pause on hidden tab, restore when visible
   useEffect(() => {
@@ -74,6 +107,7 @@ export function AmbientMusicControl() {
     if (playing) {
       stopAmbient();
       setPlaying(false);
+      setWantsPlayback(false);
       return;
     }
     // Guard against double-click while AudioContext is resuming
@@ -86,6 +120,7 @@ export function AmbientMusicControl() {
         if (ok) stopAmbient();
         return;
       }
+      setWantsPlayback(true);
       if (ok) setPlaying(true);
       // On failure: keep playing=false, user sees no false-positive state
     } finally {

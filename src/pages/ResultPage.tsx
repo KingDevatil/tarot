@@ -1,4 +1,4 @@
-import { ArrowLeft, RotateCcw, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CardView } from '../components/CardView';
 import { generateLlmAnalysis, LLM_ANALYSIS_VERSION } from '../lib/llmAnalysis';
@@ -128,10 +128,6 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
           <h1>结果解析</h1>
           <p>{reading.question}</p>
         </div>
-        <button className="icon-text-button" type="button" onClick={onRestart}>
-          <ArrowLeft size={18} />
-          再占一次
-        </button>
       </section>
 
       <section className="result-summary">
@@ -196,7 +192,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
           </div>
         ) : null}
         <button className="primary-button" type="button" onClick={onRestart}>
-          <RotateCcw size={18} />
+          <Sparkles size={18} />
           开始新的占卜
         </button>
       </section>

@@ -27,6 +27,7 @@ import type {
 interface ReadingPageProps {
   initialInput?: ReadingInput;
   onComplete: (reading: ReadingResult) => void;
+  onExit: () => void;
 }
 
 type RitualStage = 'select' | 'focus' | 'shuffle' | 'cut' | 'draw' | 'reveal';
@@ -42,7 +43,7 @@ const STEP_PX = 10;
 const CARD_DELAY_PX = 50;
 const MAX_CARD_ROTATION = 18;
 
-export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
+export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPageProps) {
   const isFreeformReading = initialInput?.questionSource === 'freeform';
   const officialFreeformQuestion = isFreeformReading
     ? initialInput.customContext?.trim() ?? ''
@@ -114,20 +115,6 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
     if (settleRafRef.current) { cancelAnimationFrame(settleRafRef.current); settleRafRef.current = 0; }
     cleanupShuffleGesture.current?.();
   }, []);
-
-  useEffect(() => {
-    if (!isDrawCompleteOpen) return undefined;
-    const scrollY = window.scrollY;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = '100%';
-    return () => {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, scrollY);
-    };
-  }, [isDrawCompleteOpen]);
 
   const scheduleTransition = (callback: () => void, delay: number) => {
     const timer = window.setTimeout(() => {
@@ -394,11 +381,6 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
     }, CUT_TRANSITION_MS);
   };
 
-  const returnToQuestion = () => {
-    resetRitualAnimation();
-    setStage('select');
-  };
-
   const pickCard = (slotIndex: number) => {
     if (pickedSlots.includes(slotIndex)) return;
     if (drawnCards.length >= currentSpread.positions.length) return;
@@ -633,11 +615,11 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
           <button
             className="ritual-back-button"
             type="button"
-            disabled={selectedShuffleCard !== null || stage === 'reveal'}
-            onClick={returnToQuestion}
+            disabled={selectedShuffleCard !== null}
+            onClick={onExit}
           >
             <ChevronLeft size={18} />
-            返回问题
+            返回首页
           </button>
 
           <div className="ritual-copy">
@@ -831,37 +813,18 @@ export function ReadingPage({ initialInput, onComplete }: ReadingPageProps) {
           ) : null}
 
           {stage === 'reveal' && reading && isDrawCompleteOpen ? (
-            <div className="draw-complete-overlay" role="dialog" aria-modal="true" aria-label="抽牌完成">
-              <section className="draw-complete-panel">
-                <div className="draw-complete-scroll">
-                  <div className="draw-complete-copy">
-                    <span>{reading.spread.name}</span>
-                    <h2>抽牌完成</h2>
-                    <p>{reading.question}</p>
-                  </div>
-                  <SpreadCardLayout spread={reading.spread} className="draw-complete-cards">
-                    {reading.cards.map((drawn) => (
-                      <article
-                        key={drawn.position.id}
-                        style={drawn.position.layoutArea ? { gridArea: drawn.position.layoutArea } : undefined}
-                      >
-                        <CardView drawn={drawn} />
-                        <span>{drawn.position.label}</span>
-                      </article>
-                    ))}
-                  </SpreadCardLayout>
-                </div>
-                <div className="ritual-actions draw-complete-actions">
-                  <button className="ghost-button" type="button" onClick={startShuffle}>
-                    <RotateCcw size={18} />
-                    重新洗牌
-                  </button>
-                  <button className="primary-button" type="button" onClick={finishReading}>
-                    <Sparkles size={18} />
-                    查看解析
-                  </button>
-                </div>
-              </section>
+            <div className="table-complete-actions" aria-label="抽牌完成">
+              <div>
+                <span>{reading.spread.name}</span>
+                <strong>抽牌完成</strong>
+                <p>{reading.question}</p>
+              </div>
+              <div className="ritual-actions">
+                <button className="primary-button" type="button" onClick={finishReading}>
+                  <Sparkles size={18} />
+                  查看解析
+                </button>
+              </div>
             </div>
           ) : null}
         </section>
