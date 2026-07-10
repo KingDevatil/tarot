@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1792" viewBox="0 0 1024 1792">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="28%" r="62%">
+      <stop offset="0%" stop-color="#fff0bd"/>
+      <stop offset="30%" stop-color="#f09a38" stop-opacity=".9"/>
+      <stop offset="78%" stop-color="#241015"/>
+      <stop offset="100%" stop-color="#0e0b10"/>
+    </radialGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff2c8"/>
+      <stop offset=".45" stop-color="#d7a65c"/>
+      <stop offset="1" stop-color="#7a431e"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 .95 0 .72 0 0 .44 0 0 .32 0 .18 0 0 0 .82 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1792" rx="58" fill="#111114"/>
+  <rect x="34" y="34" width="956" height="1724" rx="42" fill="url(#frame)"/>
+  <rect x="72" y="72" width="880" height="1648" rx="28" fill="#241015"/>
+  <rect x="94" y="94" width="836" height="1604" rx="22" fill="url(#sky)"/>
+  <path d="M136 178 C286 96 738 96 888 178 M136 1614 C286 1696 738 1696 888 1614" fill="none" stroke="#ffe8a7" stroke-width="8" opacity=".9"/>
+  <path d="M164 230 C220 158 804 158 860 230 V1562 C804 1634 220 1634 164 1562 Z" fill="none" stroke="#f6c96f" stroke-width="5"/>
+  <circle cx="512" cy="560" r="276" fill="#fff" opacity=".08"/>
+  <path d="M198 1238 C304 1120 414 1196 512 1112 C622 1018 738 1072 826 966 V1534 H198Z" fill="#0c0b0f" opacity=".38"/>
+  <path d="M160 1304 C296 1236 390 1292 512 1218 C646 1138 742 1186 866 1096" fill="none" stroke="#fff0bd" stroke-width="7" opacity=".35"/>
+  <g><g transform="translate(512 850) rotate(0) scale(1.08)">
+      <path d="M-12 -230 C-28 -80 -18 80 -26 230" fill="none" stroke="#4b2113" stroke-width="26" stroke-linecap="round"/>
+      <path d="M4 -232 C18 -70 10 90 22 232" fill="none" stroke="#f09a38" stroke-width="17" stroke-linecap="round"/>
+      <path d="M-34 -120 C-88 -150 -92 -78 -42 -70" fill="#fff0bd" opacity=".75"/>
+      <path d="M34 20 C96 -8 92 74 38 82" fill="#b6d780" opacity=".82"/>
+    </g></g>
+  <g transform="translate(512 500)">
+    <circle r="120" fill="none" stroke="#ffe5a7" stroke-width="6" opacity=".78"/>
+    <text y="20" text-anchor="middle" font-family="Georgia, serif" font-size="72" font-weight="700" fill="#fff0bd">✦</text>
+  </g>
+  <rect x="178" y="120" width="668" height="132" rx="66" fill="#261315" stroke="#f4d28a" stroke-width="4" opacity=".95"/>
+  <text x="512" y="184" text-anchor="middle" font-family="'Times New Roman', Georgia, serif" font-size="54" font-weight="700" fill="#fff2c2">权杖首牌</text>
+  <text x="512" y="226" text-anchor="middle" font-family="Georgia, serif" font-size="26" letter-spacing="5" fill="#d8a552">ACE of Wands</text>
+  <rect x="376" y="1508" width="272" height="86" rx="43" fill="#261315" stroke="#f2ce85" stroke-width="4"/>
+  <text x="512" y="1566" text-anchor="middle" font-family="Georgia, serif" font-size="46" font-weight="700" fill="#fff2c2">ACE</text>
+  <text x="512" y="1642" text-anchor="middle" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="30" fill="#fff0c5">火之新的种子</text>
+  <text x="512" y="1684" text-anchor="middle" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="23" fill="#f3c778" opacity=".92">新的种子 · 灵感 · 起点打开，能量开始凝聚。</text>
+</svg>

@@ -1,0 +1,29 @@
+{
+  "name": "tarot-divination-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "test": "vitest run",
+    "build": "tsc --noEmit && vite build",
+    "build:bilibili": "VITE_TAROT_VARIANT=bilibili tsc --noEmit && VITE_TAROT_VARIANT=bilibili vite build --outDir dist-bilibili",
+    "preview": "vite preview --host 127.0.0.1",
+    "deploy:cloudflare": "npm run build && npx wrangler pages deploy dist --project-name tarot",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "playwright": "^1.61.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
+  }
+}
