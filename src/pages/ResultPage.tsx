@@ -2,7 +2,7 @@ import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CardView } from '../components/CardView';
 import { generateLlmAnalysis, LLM_ANALYSIS_VERSION } from '../lib/llmAnalysis';
-import { isLlmConfigUsable, loadLlmConfig } from '../lib/llmConfig';
+import { isLlmConfigUsable, loadLlmConfig, resolveResultLlmConfig } from '../lib/llmConfig';
 import { getCardMeaning, updateSavedReading } from '../lib/reading';
 import { getReadingContextLabel } from '../lib/readingPresentation';
 import type { LlmAnalysis, ReadingResult } from '../types';
@@ -10,6 +10,7 @@ import type { LlmAnalysis, ReadingResult } from '../types';
 interface ResultPageProps {
   reading: ReadingResult;
   onRestart: () => void;
+  onConfigure: () => void;
   onReadingUpdated: (reading: ReadingResult) => void;
 }
 
@@ -17,7 +18,7 @@ const llmAnalysisRequests = new Map<string, Promise<LlmAnalysis>>();
 const llmFailedAttempts = new Set<string>();
 
 const getLlmAttemptKey = (reading: ReadingResult) => {
-  const config = loadLlmConfig();
+  const config = resolveResultLlmConfig(loadLlmConfig(), reading.id);
   return [
     reading.id,
     config.provider,
@@ -31,14 +32,18 @@ const getLlmAnalysisRequest = (reading: ReadingResult, signal?: AbortSignal) => 
   const attemptKey = getLlmAttemptKey(reading);
   const existing = llmAnalysisRequests.get(attemptKey);
   if (existing) return existing;
-  const request = generateLlmAnalysis(reading, loadLlmConfig(), signal).finally(() => {
+  const request = generateLlmAnalysis(
+    reading,
+    resolveResultLlmConfig(loadLlmConfig(), reading.id),
+    signal,
+  ).finally(() => {
     llmAnalysisRequests.delete(attemptKey);
   });
   llmAnalysisRequests.set(attemptKey, request);
   return request;
 };
 
-export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageProps) {
+export function ResultPage({ reading, onRestart, onConfigure, onReadingUpdated }: ResultPageProps) {
   const savedLlmAnalysis =
     reading.llmAnalysis?.version === LLM_ANALYSIS_VERSION
       ? reading.llmAnalysis
@@ -51,7 +56,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    const config = loadLlmConfig();
+    const config = resolveResultLlmConfig(loadLlmConfig(), reading.id);
     const currentSavedAnalysis =
       reading.llmAnalysis?.version === LLM_ANALYSIS_VERSION
         ? reading.llmAnalysis
@@ -68,7 +73,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
 
     if (currentSavedAnalysis) {
       setLlmStatus('ready');
-      setLlmMessage(`LLM 辅助解析已生成：${currentSavedAnalysis.model}`);
+      setLlmMessage('LLM 辅助解析已生成。天命即此，愿你所成');
       return () => {
         cancelled = true;
       };
@@ -91,7 +96,7 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
         const updatedReading = { ...reading, llmAnalysis: analysis };
         setLlmAnalysis(analysis);
         setLlmStatus('ready');
-        setLlmMessage(`LLM 辅助解析已生成：${analysis.model}`);
+        setLlmMessage('LLM 辅助解析已生成。天命即此，愿你所成');
         updateSavedReading(updatedReading);
         onReadingUpdated(updatedReading);
       })
@@ -119,7 +124,8 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
   const canRetryLlm =
     llmStatus === 'fallback'
     && !savedLlmAnalysis
-    && isLlmConfigUsable(loadLlmConfig());
+    && isLlmConfigUsable(resolveResultLlmConfig(loadLlmConfig(), reading.id))
+    && !resolveResultLlmConfig(loadLlmConfig(), reading.id).managedProxy;
 
   return (
     <main className="screen result-screen">
@@ -148,6 +154,11 @@ export function ResultPage({ reading, onRestart, onReadingUpdated }: ResultPageP
         {canRetryLlm ? (
           <button className="llm-retry-button" type="button" onClick={retryLlmAnalysis}>
             重新请求 LLM
+          </button>
+        ) : null}
+        {llmStatus === 'fallback' ? (
+          <button className="llm-retry-button" type="button" onClick={onConfigure}>
+            配置自己的 LLM
           </button>
         ) : null}
       </section>

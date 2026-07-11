@@ -171,6 +171,8 @@ export interface LlmConfig {
   providerApiKeys: Partial<Record<LlmProvider, string>>;
   temperature: number;
   timeoutMs: number;
+  managedProxy?: boolean;
+  quotaKey?: string;
   privateChat?: {
     endpoint: string;
     kid: string;

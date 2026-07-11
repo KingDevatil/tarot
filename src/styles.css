@@ -752,13 +752,10 @@ button.tarot-card {
 }
 
 .reading-screen:has(.ritual-panel) {
-  width: 100vw;
+  width: 100%;
+  max-width: none;
   min-height: calc(100dvh - 86px);
-  padding: 0 14px 18px;
-}
-
-.reading-screen:has(.ritual-panel) > .section-header {
-  display: none;
+  padding: 0 0 18px;
 }
 
 .ritual-panel {
@@ -769,14 +766,14 @@ button.tarot-card {
   gap: 22px;
   overflow: hidden;
   padding: 72px clamp(16px, 3vw, 42px) 34px;
-  border-color: rgba(244, 213, 141, 0.28);
+  border: 0;
+  border-radius: 0;
   background:
     linear-gradient(180deg, rgba(7, 7, 10, 0.2), rgba(7, 7, 10, 0.58)),
     url("/assets/backgrounds/tarot-reading-table-bg.png") center center / cover no-repeat,
     var(--bg-soft);
-  box-shadow:
-    inset 0 0 0 1px rgba(244, 213, 141, 0.08),
-    0 34px 100px rgba(0, 0, 0, 0.52);
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .ritual-panel::before {
@@ -791,14 +788,7 @@ button.tarot-card {
 }
 
 .ritual-panel::after {
-  position: absolute;
-  inset: 12% 12% 10%;
-  z-index: 0;
-  border: 1px solid rgba(244, 213, 141, 0.12);
-  border-radius: 8px;
-  box-shadow: inset 0 0 42px rgba(244, 213, 141, 0.04);
-  content: "";
-  pointer-events: none;
+  content: none;
 }
 
 .ritual-panel > * {
@@ -1380,7 +1370,6 @@ button.tarot-card {
 .table-complete-actions .ritual-actions {
   flex: 0 0 auto;
   margin: 0;
-  justify-content: center;
 }
 
 .result-summary {
@@ -1468,8 +1457,7 @@ button.tarot-card {
 }
 
 .advice-panel > .primary-button {
-  display: flex;
-  width: fit-content;
+  justify-self: start;
   margin-top: 18px;
 }
 
@@ -1701,6 +1689,25 @@ button.tarot-card {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.llm-config-guidance {
+  margin: 14px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(240, 206, 133, 0.5);
+  border-radius: 8px;
+  background: rgba(240, 206, 133, 0.1);
+}
+
+.llm-config-guidance strong {
+  color: var(--accent-strong);
+}
+
+.llm-config-guidance p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .settings-test-result strong {
   color: var(--accent-strong);
 }
@@ -1924,8 +1931,8 @@ button.tarot-card {
   left: 50%;
   bottom: 16px;
   z-index: 20;
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
   width: min(640px, calc(100vw - 32px));
   padding: 8px;
@@ -1938,8 +1945,6 @@ button.tarot-card {
 
 .bottom-nav button {
   display: flex;
-  flex: 1 1 0;
-  min-width: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -3002,311 +3007,5 @@ button.tarot-card {
 
   .ambient-volume-row {
     width: 112px;
-  }
-}
-
-@media (max-width: 540px) {
-  .app-shell {
-    padding-bottom: 74px;
-  }
-
-  .screen {
-    width: min(100vw - 20px, 680px);
-  }
-
-  .home-search-screen {
-    width: min(100% - 24px, 1080px);
-    min-height: calc(100dvh - 74px);
-    padding-top: 14px;
-  }
-
-  .home-brand strong {
-    font-size: 15px;
-    letter-spacing: 0.04em;
-  }
-
-  .question-search,
-  .question-search.has-results {
-    margin-top: clamp(42px, 8vh, 64px);
-  }
-
-  .question-search-copy h1 {
-    font-size: clamp(34px, 10vw, 44px);
-    line-height: 1.06;
-    letter-spacing: 0;
-    white-space: nowrap;
-  }
-
-  .question-search-copy p {
-    margin-top: 12px;
-    font-size: 13px;
-    line-height: 1.45;
-  }
-
-  .question-search-form {
-    gap: 10px;
-    min-height: 0;
-    margin-top: 22px;
-    padding: 12px;
-  }
-
-  .question-search-form > svg {
-    width: 19px;
-    height: 19px;
-  }
-
-  .question-search-form textarea {
-    min-height: 28px;
-    padding: 2px 0;
-    font-size: 15px;
-    line-height: 1.35;
-  }
-
-  .question-submit-button {
-    min-height: 46px;
-    font-size: 15px;
-    white-space: nowrap;
-  }
-
-  .question-search-meta {
-    padding-top: 7px;
-  }
-
-  .home-search-footer {
-    margin-top: clamp(52px, 10vh, 90px);
-  }
-
-  .reading-screen:has(.ritual-panel) {
-    min-height: calc(100dvh - 74px);
-    padding: 0 8px 12px;
-  }
-
-  .reading-screen .section-header h1 {
-    font-size: 30px;
-    white-space: nowrap;
-  }
-
-  .reading-screen .section-header p {
-    font-size: 13px;
-  }
-
-  .ritual-panel {
-    min-height: calc(100dvh - 90px);
-    padding: 58px 10px 20px;
-    gap: 14px;
-  }
-
-  .ritual-panel::after {
-    inset: 88px 16px 32px;
-  }
-
-  .ritual-back-button {
-    top: 14px;
-    left: 14px;
-    min-height: 34px;
-    padding: 0 10px;
-    font-size: 15px;
-  }
-
-  .ritual-copy h2 {
-    font-size: clamp(30px, 9vw, 42px);
-    white-space: nowrap;
-  }
-
-  .ritual-copy p {
-    max-width: 300px;
-    margin-top: 6px;
-    font-size: 13px;
-    line-height: 1.42;
-  }
-
-  .focus-ritual {
-    width: min(100% - 42px, 520px);
-    padding: 0;
-  }
-
-  .focus-ritual__symbol {
-    margin-bottom: 8px;
-    font-size: 28px;
-  }
-
-  .focus-ritual > p {
-    font-size: clamp(22px, 7.2vw, 30px);
-    line-height: 1.25;
-  }
-
-  .focus-ritual ol {
-    width: min(100%, 340px);
-    margin: 16px auto;
-    gap: 4px;
-    padding-left: 22px;
-    font-size: 15px;
-    line-height: 1.45;
-  }
-
-  .focus-ritual .primary-button {
-    min-height: 44px;
-    padding-inline: 22px;
-    white-space: nowrap;
-  }
-
-  .shuffle-gesture {
-    gap: 10px;
-    padding: 6px 10px 0;
-  }
-
-  .shuffle-gesture__deck {
-    position: relative;
-    z-index: 1;
-    width: min(188px, 52vw);
-  }
-
-  .shuffle-gesture__hint {
-    position: relative;
-    z-index: 30;
-    width: fit-content;
-    max-width: calc(100vw - 70px);
-    margin-top: -2px;
-    padding: 8px 12px;
-    border-radius: 999px;
-    background: rgba(10, 9, 12, 0.72);
-    backdrop-filter: blur(10px);
-  }
-
-  .shuffle-gesture__hint strong {
-    font-size: 14px;
-    white-space: nowrap;
-  }
-
-  .shuffle-gesture__hint small {
-    display: none;
-  }
-
-  .manual-draw-area {
-    width: min(100% - 22px, 640px);
-  }
-
-  .reveal-spread.spread-layout {
-    justify-items: center;
-  }
-
-  .reveal-spread.spread-layout--single {
-    grid-template-columns: minmax(154px, 188px);
-    justify-content: center;
-  }
-
-  .reveal-spread.spread-layout--single .tarot-card {
-    width: min(188px, 58vw);
-  }
-
-  .table-complete-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-    place-items: center;
-    width: min(100% - 42px, 520px);
-    margin-bottom: clamp(26px, 5vh, 56px);
-    justify-items: center;
-    text-align: center;
-  }
-
-  .table-complete-actions > div:first-child {
-    display: grid;
-    place-items: center;
-    justify-self: stretch;
-    justify-items: center;
-    width: 100%;
-    text-align: center;
-  }
-
-  .table-complete-actions strong {
-    font-size: clamp(24px, 8vw, 34px);
-    white-space: nowrap;
-  }
-
-  .table-complete-actions p {
-    max-width: 100%;
-    font-size: 13px;
-  }
-
-  .table-complete-actions .ritual-actions {
-    display: flex;
-    justify-content: center;
-    justify-items: center;
-    width: 100%;
-  }
-
-  .table-complete-actions button,
-  .advice-panel > .primary-button {
-    margin-right: auto;
-    margin-left: auto;
-  }
-
-  .advice-panel {
-    text-align: center;
-  }
-
-  .advice-list {
-    text-align: left;
-  }
-
-  .bottom-nav {
-    bottom: 8px;
-    width: min(100vw - 18px, 640px);
-    padding: 6px;
-    gap: 4px;
-  }
-
-  .bottom-nav button {
-    height: 48px;
-    gap: 2px;
-  }
-
-  .bottom-nav svg {
-    width: 19px;
-    height: 19px;
-  }
-
-  .bottom-nav span {
-    font-size: 11px;
-    white-space: nowrap;
-  }
-
-  .ambient-music-control {
-    right: 10px;
-    bottom: calc(72px + env(safe-area-inset-bottom));
-    min-height: 38px;
-  }
-
-  .ambient-toggle {
-    width: 38px;
-    min-height: 38px;
-  }
-
-  .ambient-volume-row {
-    width: 0;
-    overflow: hidden;
-    padding: 0;
-    gap: 0;
-  }
-
-  .ambient-music-control:hover .ambient-volume-row,
-  .ambient-music-control:focus-within .ambient-volume-row {
-    width: 112px;
-    padding: 0 10px 0 2px;
-    gap: 6px;
-  }
-}
-
-@media (max-width: 380px) {
-  .question-search-copy h1 {
-    font-size: clamp(31px, 9.2vw, 36px);
-  }
-
-  .focus-ritual > p {
-    font-size: clamp(20px, 6.8vw, 26px);
-  }
-
-  .ritual-copy h2 {
-    font-size: clamp(28px, 8.4vw, 36px);
   }
 }

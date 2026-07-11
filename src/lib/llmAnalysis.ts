@@ -392,7 +392,7 @@ export const generateLlmAnalysis = async (
   const result = await requestLlmContent(config, request);
   let raw = parseLlmJson(result.content);
 
-  if (!isAnalysisSpecificEnough(raw, reading)) {
+  if (!config.managedProxy && !isAnalysisSpecificEnough(raw, reading)) {
     // Simple backoff before quality retry, abortable via the same signal
     await new Promise<void>((resolve, reject) => {
       const timer = window.setTimeout(resolve, 800);
@@ -519,6 +519,16 @@ const requestLlmContent = async (
 
     if (!response.ok) {
       console.error('[LLM] HTTP error', response.status);
+      const errorPayload = await readErrorPayload(response);
+      if (errorPayload.code === 'DAILY_QUOTA_EXHAUSTED') {
+        throw new LlmAnalysisError('今日免费 LLM 解析额度已经消耗完，请在配置页填写并使用自己的 LLM。');
+      }
+      if (errorPayload.code === 'ANALYSIS_IN_PROGRESS') {
+        throw new LlmAnalysisError('默认 LLM 正在生成这次解析，请稍后重新打开本次占卜结果。');
+      }
+      if (config.managedProxy) {
+        throw new LlmAnalysisError('默认 LLM 未返回结果，免费额度可能已经消耗完，请配置并使用自己的 LLM；本次占卜结果仍可正常查看。');
+      }
       throw new LlmAnalysisError('请求LLM服务失败，请稍后重试或检查配置');
     }
 
@@ -655,7 +665,19 @@ const buildHeaders = (config: LlmConfig) => {
   } else {
     headers.Authorization = `Bearer ${config.apiKey.trim()}`;
   }
+  if (config.managedProxy && config.quotaKey) {
+    headers['X-Tarot-Reading-Id'] = config.quotaKey;
+  }
   return headers;
+};
+
+const readErrorPayload = async (response: Response): Promise<{ code?: string }> => {
+  try {
+    const payload = await response.json() as { code?: unknown };
+    return { code: typeof payload.code === 'string' ? payload.code : undefined };
+  } catch {
+    return {};
+  }
 };
 
 const getFinishReason = (payload: unknown) => {

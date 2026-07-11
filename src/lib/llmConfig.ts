@@ -30,7 +30,7 @@ export const llmProviderPresets: Record<LlmProvider, {
 };
 
 export const defaultLlmConfig: LlmConfig = {
-  enabled: false,
+  enabled: true,
   thinkingEnabled: false,
   provider: 'openai_compatible',
   baseUrl: llmProviderPresets.openai_compatible.baseUrl,
@@ -38,7 +38,7 @@ export const defaultLlmConfig: LlmConfig = {
   apiKey: '',
   providerApiKeys: {},
   temperature: 0.7,
-  timeoutMs: 30000,
+  timeoutMs: 300000,
 };
 
 export const bilibiliLlmConfig: LlmConfig = {
@@ -50,12 +50,25 @@ export const bilibiliLlmConfig: LlmConfig = {
   apiKey: 'builtin',
   providerApiKeys: {},
   temperature: 0.7,
-  timeoutMs: 30000,
+  timeoutMs: 300000,
   privateChat: {
     endpoint: '/api/bxk/private_chat',
     kid: '1114',
     chatMod: 'bot',
   },
+};
+
+export const managedLlmConfig: LlmConfig = {
+  enabled: true,
+  thinkingEnabled: false,
+  provider: 'openai_compatible',
+  baseUrl: '/api/managed-llm',
+  model: 'managed-default',
+  apiKey: 'server-managed',
+  providerApiKeys: {},
+  temperature: 0.7,
+  timeoutMs: 300000,
+  managedProxy: true,
 };
 
 interface StoredLlmConfig extends Partial<LlmConfig> {
@@ -107,6 +120,14 @@ export const isLlmConfigUsable = (config: LlmConfig) =>
     Boolean(config.privateChat?.endpoint && config.privateChat.kid)
     || Boolean(config.baseUrl.trim() && config.model.trim() && config.apiKey.trim())
   );
+
+export const needsLlmApiKey = (config: LlmConfig) =>
+  config.enabled && !config.privateChat && !config.apiKey.trim();
+
+export const resolveResultLlmConfig = (config: LlmConfig, readingId: string): LlmConfig => {
+  if (!config.enabled || isLlmConfigUsable(config)) return { ...config, quotaKey: readingId };
+  return { ...managedLlmConfig, quotaKey: readingId };
+};
 
 export const applyLlmProviderPreset = (config: LlmConfig, provider: LlmProvider): LlmConfig => ({
   ...config,

@@ -6,6 +6,7 @@ import {
   defaultLlmConfig,
   llmProviderPresets,
   loadLlmConfig,
+  needsLlmApiKey,
   saveLlmConfig,
 } from '../lib/llmConfig';
 import type { LlmConfig, LlmProvider } from '../types';
@@ -89,6 +90,7 @@ export function SettingsPage() {
   const canTest = Boolean(config.baseUrl.trim() && config.model.trim() && config.apiKey.trim());
   const isTesting = testState.status === 'testing';
   const providerPreset = llmProviderPresets[config.provider];
+  const apiKeyRequired = needsLlmApiKey(config);
 
   return (
     <main className="screen settings-screen">
@@ -114,6 +116,13 @@ export function SettingsPage() {
           />
           <span>开启 LLM 辅助解析</span>
         </label>
+
+        {apiKeyRequired ? (
+          <div className="llm-config-guidance" role="alert">
+            <strong>还差一步：填写 API Key</strong>
+            <p>LLM 辅助解析已开启。请在下方填写所选服务商的 API Key，然后保存配置；建议再测试一次连接。</p>
+          </div>
+        ) : null}
 
         <label className="toggle-row">
           <input
@@ -182,7 +191,7 @@ export function SettingsPage() {
             <input
               type="number"
               min="5000"
-              max="120000"
+              max="600000"
               step="1000"
               value={config.timeoutMs}
               onChange={(event) => update('timeoutMs', Number(event.target.value))}

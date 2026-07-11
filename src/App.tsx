@@ -89,6 +89,7 @@ export function App() {
         <ResultPage
           reading={activeReading}
           onRestart={() => navigate('home')}
+          onConfigure={() => navigate('settings')}
           onReadingUpdated={updateReading}
         />
       );

@@ -41,9 +41,10 @@ export function HomePage({
   const submitQuestion = async (event: FormEvent) => {
     event.preventDefault();
     setMessage('');
+    const llmConfig = loadLlmConfig();
     setStatus('loading');
     try {
-      const nextAnalysis = await analyzeDivinationQuestion(question, loadLlmConfig());
+      const nextAnalysis = await analyzeDivinationQuestion(question, llmConfig);
       setAnalysis(nextAnalysis);
       setSelectedFlowId(nextAnalysis.recommendations[0]?.id ?? '');
       setStatus('idle');
@@ -98,8 +99,8 @@ export function HomePage({
 
       <section className={`question-search ${analysis ? 'has-results' : ''}`}>
         <div className="question-search-copy">
-          <h1>想问塔罗什么？</h1>
-          <p>写下问题，为你匹配占卜方式。</p>
+          <h1>你想问塔罗什么？</h1>
+          <p>写下此刻最想厘清的问题，我们会为你匹配合适的占卜方式。</p>
         </div>
 
         <form className="question-search-form" onSubmit={submitQuestion}>
@@ -138,7 +139,7 @@ export function HomePage({
           <span>{question.length} / 300</span>
           <span>Enter 分析 · Shift + Enter 换行</span>
         </div>
-        {message ? <p className="question-search-error">{message}</p> : null}
+        {message ? <p className="question-search-error" role="alert">{message}</p> : null}
 
         {status === 'loading' ? (
           <div className="question-analysis-loading" role="status">
@@ -155,7 +156,7 @@ export function HomePage({
         <section className="flow-recommendations" aria-live="polite">
           <div className="flow-recommendations-header">
             <div>
-          <p className="analysis-category">
+              <p className="analysis-category">
                 {analysis.categoryLabel}
                 <span>{analysis.source === 'llm' ? 'LLM 分析' : '智能匹配'}</span>
               </p>
@@ -200,7 +201,7 @@ export function HomePage({
           </div>
 
           <div className="flow-confirmation">
-            <p>选择后进入抽牌流程。</p>
+            <p>选择后将进入专注、洗牌、切牌与抽牌流程。</p>
             <button className="primary-button" type="button" onClick={beginReading}>
               选择此方式
               <ArrowRight size={18} />
@@ -211,7 +212,7 @@ export function HomePage({
 
       {!analysis && status !== 'loading' ? (
         <footer className="home-search-footer">
-          <p>结果仅供娱乐参考。</p>
+          <p>塔罗占卜仅供自我观察与娱乐参考，不替代医疗、法律或投资等专业建议。</p>
           {latest ? (
             <button type="button" onClick={() => onOpenLatest(latest)}>
               <Clock3 size={16} />

@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "test": "vitest run",
     "build": "tsc --noEmit && vite build",
-    "build:bilibili": "VITE_TAROT_VARIANT=bilibili tsc --noEmit && VITE_TAROT_VARIANT=bilibili vite build --outDir dist-bilibili",
+    "build:bilibili": "tsc --noEmit && vite build --mode bilibili --outDir dist-bilibili",
     "preview": "vite preview --host 127.0.0.1",
     "deploy:cloudflare": "npm run build && npx wrangler pages deploy dist --project-name tarot",
     "typecheck": "tsc --noEmit"
