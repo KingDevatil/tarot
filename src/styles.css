@@ -2374,6 +2374,11 @@ button.tarot-card {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .reveal-spread.spread-layout--single {
+    grid-template-columns: minmax(0, min(72vw, 240px));
+    justify-content: center;
+  }
+
   .reveal-position {
     min-width: 0;
   }
@@ -2387,6 +2392,8 @@ button.tarot-card {
   .table-complete-actions {
     display: grid;
     gap: 12px;
+    justify-items: center;
+    text-align: center;
   }
 
   .table-complete-actions p {
@@ -2397,7 +2404,8 @@ button.tarot-card {
     display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
-    width: 100%;
+    width: min(280px, 100%);
+    justify-self: center;
   }
 
   .table-complete-actions button {

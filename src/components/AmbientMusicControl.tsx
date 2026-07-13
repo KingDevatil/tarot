@@ -75,7 +75,6 @@ export function AmbientMusicControl() {
       }
     };
 
-    void beginPlayback();
     window.addEventListener("pointerdown", beginPlayback, { once: true, passive: true });
     window.addEventListener("keydown", beginPlayback, { once: true });
 

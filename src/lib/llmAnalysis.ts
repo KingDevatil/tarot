@@ -510,12 +510,7 @@ const requestLlmContent = async (
       }
     }
 
-    const response = await fetch(buildChatCompletionsUrl(config.baseUrl), {
-      method: 'POST',
-      headers: buildHeaders(config),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const response = await fetchLlmWithRetry(config, body, signal);
 
     if (!response.ok) {
       console.error('[LLM] HTTP error', response.status);
@@ -529,7 +524,7 @@ const requestLlmContent = async (
       if (config.managedProxy) {
         throw new LlmAnalysisError('默认 LLM 未返回结果，免费额度可能已经消耗完，请配置并使用自己的 LLM；本次占卜结果仍可正常查看。');
       }
-      throw new LlmAnalysisError('请求LLM服务失败，请稍后重试或检查配置');
+      throw new LlmAnalysisError('个人 LLM 请求失败，请稍后重试或检查配置；也可以在配置页恢复默认试用。');
     }
 
     const payload = await response.json();
@@ -564,6 +559,48 @@ const requestLlmContent = async (
     timeoutController.abort();
   }
 };
+
+const fetchLlmWithRetry = async (
+  config: LlmConfig,
+  body: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<Response> => {
+  const attempts = config.managedProxy ? 5 : 2;
+  let lastResponse: Response | undefined;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(buildChatCompletionsUrl(config.baseUrl), {
+        method: 'POST',
+        headers: buildHeaders(config),
+        body: JSON.stringify(body),
+        signal,
+      });
+      lastResponse = response;
+
+      const shouldRetryManaged = config.managedProxy
+        && (response.status === 409 || response.status === 502 || response.status === 503 || response.status === 504);
+      const shouldRetryPersonal = !config.managedProxy
+        && (response.status === 502 || response.status === 503 || response.status === 504);
+      if ((!shouldRetryManaged && !shouldRetryPersonal) || attempt === attempts - 1) return response;
+    } catch (error) {
+      if (signal.aborted || attempt === attempts - 1) throw error;
+    }
+
+    await waitForRetry(config.managedProxy ? 1800 + attempt * 1200 : 1000, signal);
+  }
+
+  if (lastResponse) return lastResponse;
+  throw new LlmAnalysisError('LLM 请求未返回结果');
+};
+
+const waitForRetry = (delayMs: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
+  const timer = window.setTimeout(resolve, delayMs);
+  signal.addEventListener('abort', () => {
+    window.clearTimeout(timer);
+    reject(new DOMException('Aborted', 'AbortError'));
+  }, { once: true });
+});
 
 const requestPrivateChatContent = async (
   config: LlmConfig,

@@ -2,7 +2,6 @@ const AMBIENT_TRACK_SRC = "/assets/audio/mystic-journey.mp3";
 const MASTER_GAIN = 0.46;
 
 let audio: HTMLAudioElement | null = null;
-let audioLoadPromise: Promise<HTMLAudioElement> | null = null;
 let started = false;
 
 function createAudio(src: string): HTMLAudioElement {
@@ -12,22 +11,9 @@ function createAudio(src: string): HTMLAudioElement {
   return player;
 }
 
-async function getAudio(): Promise<HTMLAudioElement> {
-  if (audio) return audio;
-  if (!audioLoadPromise) {
-    audioLoadPromise = fetch(AMBIENT_TRACK_SRC, { cache: "force-cache" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Ambient audio failed to load");
-        const blobUrl = URL.createObjectURL(await response.blob());
-        audio = createAudio(blobUrl);
-        return audio;
-      })
-      .catch(() => {
-        audio = createAudio(AMBIENT_TRACK_SRC);
-        return audio;
-      });
-  }
-  return audioLoadPromise;
+function getAudio(): HTMLAudioElement {
+  if (!audio) audio = createAudio(AMBIENT_TRACK_SRC);
+  return audio;
 }
 
 export function isAudioContextReady(): boolean {
@@ -35,13 +21,13 @@ export function isAudioContextReady(): boolean {
 }
 
 export function preloadAmbient() {
-  if (isAudioContextReady()) void getAudio();
+  if (isAudioContextReady()) getAudio().load();
 }
 
 export async function startAmbient(volume: number): Promise<boolean> {
   if (!isAudioContextReady()) return false;
 
-  const player = await getAudio();
+  const player = getAudio();
   player.volume = Math.max(0, Math.min(1, volume * MASTER_GAIN));
 
   try {
