@@ -41,6 +41,45 @@ button {
   color: inherit;
 }
 
+.app-fallback {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.app-fallback-mark {
+  color: var(--accent-strong);
+  font-size: 32px;
+}
+
+.app-fallback h1,
+.app-fallback p {
+  margin: 0;
+}
+
+.app-fallback h1 {
+  font-size: 22px;
+}
+
+.app-fallback p {
+  color: var(--muted);
+}
+
+.app-fallback button {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: #17130b;
+  background: var(--accent-strong);
+  font-weight: 700;
+}
+
 .app-shell {
   position: relative;
   isolation: isolate;

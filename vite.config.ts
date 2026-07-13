@@ -8,6 +8,9 @@ declare const process: {
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
   plugins: [react()],
+  build: {
+    target: 'es2018',
+  },
   test: {
     environment: 'node',
   },
