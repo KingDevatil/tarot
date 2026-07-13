@@ -2,7 +2,12 @@ import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CardView } from '../components/CardView';
 import { generateLlmAnalysis, LLM_ANALYSIS_VERSION } from '../lib/llmAnalysis';
-import { isLlmConfigUsable, loadLlmConfig, resolveResultLlmConfig } from '../lib/llmConfig';
+import {
+  isLlmConfigUsable,
+  loadLlmConfig,
+  managedLlmConfig,
+  resolveResultLlmConfig,
+} from '../lib/llmConfig';
 import { getCardMeaning, updateSavedReading } from '../lib/reading';
 import { getReadingContextLabel } from '../lib/readingPresentation';
 import type { LlmAnalysis, ReadingResult } from '../types';
@@ -32,13 +37,19 @@ const getLlmAnalysisRequest = (reading: ReadingResult, signal?: AbortSignal) => 
   const attemptKey = getLlmAttemptKey(reading);
   const existing = llmAnalysisRequests.get(attemptKey);
   if (existing) return existing;
-  const request = generateLlmAnalysis(
-    reading,
-    resolveResultLlmConfig(loadLlmConfig(), reading.id),
-    signal,
-  ).finally(() => {
-    llmAnalysisRequests.delete(attemptKey);
-  });
+  const config = resolveResultLlmConfig(loadLlmConfig(), reading.id);
+  const request = generateLlmAnalysis(reading, config, signal)
+    .catch((error) => {
+      if (config.managedProxy || signal?.aborted) throw error;
+      return generateLlmAnalysis(
+        reading,
+        { ...managedLlmConfig, quotaKey: reading.id },
+        signal,
+      );
+    })
+    .finally(() => {
+      llmAnalysisRequests.delete(attemptKey);
+    });
   llmAnalysisRequests.set(attemptKey, request);
   return request;
 };

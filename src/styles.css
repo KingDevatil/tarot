@@ -2351,6 +2351,57 @@ button.tarot-card {
     width: min(100%, 150px);
   }
 
+  .reveal-spread.spread-layout--single {
+    grid-template-columns: minmax(0, min(72vw, 240px));
+    justify-content: center;
+  }
+
+  .table-complete-actions {
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .table-complete-actions > div:first-child {
+    width: 100%;
+  }
+
+  .table-complete-actions p {
+    max-width: min(460px, 100%);
+    margin-inline: auto;
+    white-space: normal;
+  }
+
+  .table-complete-actions .ritual-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: min(280px, 100%);
+    justify-self: center;
+  }
+
+  .llm-status-panel {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .llm-status-panel > svg {
+    margin-top: 2px;
+  }
+
+  .llm-status-panel span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.65;
+  }
+
+  .llm-status-panel .llm-retry-button {
+    grid-column: 1 / -1;
+    width: 100%;
+    white-space: normal;
+  }
+
   .spread-layout--triangle > *,
   .spread-layout--relationship > *,
   .spread-layout--horseshoe > *,
@@ -2426,25 +2477,6 @@ button.tarot-card {
     max-width: 100%;
     overflow-wrap: anywhere;
     text-align: center;
-  }
-
-  .table-complete-actions {
-    display: grid;
-    gap: 12px;
-    justify-items: center;
-    text-align: center;
-  }
-
-  .table-complete-actions p {
-    white-space: normal;
-  }
-
-  .table-complete-actions .ritual-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
-    width: min(280px, 100%);
-    justify-self: center;
   }
 
   .table-complete-actions button {
@@ -3046,13 +3078,13 @@ button.tarot-card {
   accent-color: var(--accent);
 }
 
-@media (max-width: 540px) {
+@media (max-width: 860px) {
   .ambient-music-control {
     right: 12px;
     bottom: calc(88px + env(safe-area-inset-bottom));
   }
 
   .ambient-volume-row {
-    width: 112px;
+    display: none;
   }
 }
