@@ -82,6 +82,7 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
       ? { [categoryId]: initialInput.generatedQuestion }
       : {},
   );
+  const [manualQuestions, setManualQuestions] = useState<Record<string, string>>({});
   const [questionGeneration, setQuestionGeneration] = useState<{
     categoryId: string;
     status: 'idle' | 'loading' | 'error';
@@ -104,9 +105,12 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
   );
   const customContext = customContexts[categoryId] ?? '';
   const generatedQuestion = generatedQuestions[categoryId] ?? '';
+  const manualQuestion = manualQuestions[categoryId];
   const question = isFreeformReading
     ? officialFreeformQuestion
-    : generatedQuestion || standardQuestion;
+    : isSpreadTopic
+      ? (manualQuestion ?? standardQuestion).trim()
+      : generatedQuestion || standardQuestion;
 
   useEffect(() => () => {
     transitionTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -207,6 +211,9 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
         resolveLlmConfig(llmConfig, `generation-${crypto.randomUUID()}`),
       );
       setGeneratedQuestions((current) => ({ ...current, [categoryId]: nextQuestion }));
+      if (isSpreadTopic) {
+        setManualQuestions((current) => ({ ...current, [categoryId]: nextQuestion }));
+      }
       setQuestionGeneration({
         categoryId,
         status: 'idle',
@@ -410,7 +417,9 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
             customContext: isFreeformReading
               ? officialFreeformQuestion
               : customContext.trim() || undefined,
-            generatedQuestion: generatedQuestion || undefined,
+            generatedQuestion: isSpreadTopic
+              ? question
+              : generatedQuestion || undefined,
           },
           nextDrawnCards.map(({ card, orientation }) => ({ card, orientation })),
         ),
@@ -450,6 +459,7 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
     : category.requiredParams;
   const allParamsReady =
     isFreeformReading
+    || (isSpreadTopic && Boolean(question))
     || Boolean(generatedQuestion)
     || requiredParamKeys.every((key) => params[key]?.trim());
   const hasCustomContext = Boolean(customContext.trim());
@@ -460,7 +470,8 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
     && questionGeneration.status === 'loading';
   const canGenerateQuestion = allParamsReady && hasCustomContext && llmConfigReady && !isGeneratingQuestion;
   const canStartShuffle =
-    allParamsReady
+    Boolean(question)
+    && allParamsReady
     && (!requiresGeneratedQuestion || Boolean(generatedQuestion))
     && !isGeneratingQuestion;
 
@@ -583,13 +594,31 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
 
             <div className="question-preview">
               <span>
-                {isFreeformReading
+                {isSpreadTopic
+                  ? '本次占卜问题'
+                  : isFreeformReading
                   ? '原始问题'
                   : generatedQuestion
                     ? 'LLM 生成问题'
                     : '标准化问题'}
               </span>
-              <strong>{question}</strong>
+              {isSpreadTopic ? (
+                <textarea
+                  className="question-preview-input"
+                  aria-label="本次占卜问题"
+                  value={manualQuestion ?? standardQuestion}
+                  maxLength={300}
+                  rows={3}
+                  onChange={(event) => {
+                    setManualQuestions((current) => ({
+                      ...current,
+                      [categoryId]: event.target.value,
+                    }));
+                  }}
+                />
+              ) : (
+                <strong>{question}</strong>
+              )}
               <em>{currentSpread.name} · 需要抽取 {currentSpread.positions.length} 张</em>
               {currentSpread.themes?.length ? (
                 <small>适用主题：{currentSpread.themes.join(' / ')}</small>
