@@ -5,6 +5,7 @@ import {
   stopAmbient,
   setAmbientVolume,
   isAudioContextReady,
+  preloadAmbient,
 } from "../lib/ambientAudio";
 
 const STORAGE_KEY = "tarot-ambient-music-v2";
@@ -48,6 +49,10 @@ export function AmbientMusicControl() {
   useEffect(() => {
     savePrefs({ playing: wantsPlayback, volume });
   }, [wantsPlayback, volume]);
+
+  useEffect(() => {
+    preloadAmbient();
+  }, []);
 
   useEffect(() => {
     if (!supported || !wantsPlayback || playing || startingRef.current) return;

@@ -8,3 +8,6 @@
   Cache-Control: no-store
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
+
+/assets/audio/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
