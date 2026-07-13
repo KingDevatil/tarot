@@ -89,18 +89,11 @@ export async function onRequestPost(context) {
   const timeout = setTimeout(() => upstreamController.abort(), UPSTREAM_TIMEOUT_MS);
   let upstream;
   try {
+    const upstreamRequest = buildUpstreamRequest(env, input, messages);
     upstream = await fetch(`${env.LLM_BASE_URL.replace(/\/+$/, '')}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.LLM_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: env.LLM_MODEL,
-        messages,
-        temperature: clampNumber(input.temperature, 0, 1.2, 0.7),
-        max_tokens: clampNumber(input.max_tokens, 256, MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS),
-      }),
+      headers: upstreamRequest.headers,
+      body: JSON.stringify(upstreamRequest.body),
       signal: upstreamController.signal,
     });
   } catch {
@@ -137,6 +130,40 @@ export async function onRequestPost(context) {
   }
 
   return new Response(responseText, { status: 200, headers: securityHeaders });
+}
+
+export function buildUpstreamRequest(env, input, messages) {
+  const isMimo = isMimoUpstream(env.LLM_BASE_URL);
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(isMimo
+      ? { 'api-key': env.LLM_API_KEY }
+      : { Authorization: `Bearer ${env.LLM_API_KEY}` }),
+  };
+  const maxTokens = clampNumber(
+    input.max_completion_tokens ?? input.max_tokens,
+    256,
+    MAX_OUTPUT_TOKENS,
+    MAX_OUTPUT_TOKENS,
+  );
+  const body = {
+    model: env.LLM_MODEL,
+    messages,
+    temperature: clampNumber(input.temperature, 0, 1.2, 0.7),
+    ...(isMimo
+      ? { max_completion_tokens: maxTokens }
+      : { max_tokens: maxTokens }),
+  };
+  return { headers, body };
+}
+
+export function isMimoUpstream(baseUrl) {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase();
+    return hostname === 'api.xiaomimimo.com' || hostname.endsWith('.xiaomimimo.com');
+  } catch {
+    return false;
+  }
 }
 
 function validateSameOrigin(request) {

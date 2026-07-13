@@ -28,6 +28,8 @@ npx wrangler d1 execute tarot-public --remote --file migrations/0001_managed_llm
 - `LLM_MODEL`：服务端固定使用的模型
 - `RATE_LIMIT_SALT`：至少 32 个随机字符，必须使用 Secret
 
+当 `LLM_BASE_URL` 使用 `xiaomimimo.com` 域名时，代理会自动使用小米 MiMo 的 `api-key` 鉴权头和 `max_completion_tokens` 参数；API Key 仍只存在于服务端 Secret 中。
+
 建议为 Preview 和 Production 分别设置独立密钥和额度。
 
 ## 3. 部署
