@@ -148,6 +148,9 @@ export const analyzeDivinationQuestion = async (
   }
 
   const fallback = buildLocalQuestionAnalysis(normalizedInput);
+  if (import.meta.env.DEV) {
+    return fallback;
+  }
   if (!config.enabled || !config.baseUrl.trim() || !config.model.trim() || !config.apiKey.trim()) {
     return fallback;
   }
