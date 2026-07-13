@@ -20,10 +20,6 @@ export function isAudioContextReady(): boolean {
   return typeof Audio !== "undefined";
 }
 
-export function preloadAmbient() {
-  if (isAudioContextReady()) getAudio().load();
-}
-
 export async function startAmbient(volume: number): Promise<boolean> {
   if (!isAudioContextReady()) return false;
 

@@ -4,9 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>塔罗占卜</title>
+    <style>
+      .app-boot { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 14px; color: #e9dfc1; background: #06070d; font: 14px system-ui, sans-serif; }
+      .app-boot-mark { font-size: 30px; animation: app-boot-pulse 1.4s ease-in-out infinite; }
+      @keyframes app-boot-pulse { 50% { opacity: .35; transform: scale(.86); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-boot" role="status" aria-live="polite">
+        <span class="app-boot-mark" aria-hidden="true">✦</span>
+        <span>正在开启塔罗占卜</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
