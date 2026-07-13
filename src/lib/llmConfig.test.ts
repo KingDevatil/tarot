@@ -1,6 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LlmConfig } from '../types';
-import { defaultLlmConfig, resolveLlmConfig } from './llmConfig';
+import { defaultLlmConfig, loadLlmConfig, resolveLlmConfig, saveLlmConfig } from './llmConfig';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+const stubStoredConfig = (stored: Record<string, unknown>) => {
+  let value = JSON.stringify(stored);
+  vi.stubGlobal('localStorage', {
+    getItem: vi.fn(() => value),
+    setItem: vi.fn((_key: string, nextValue: string) => { value = nextValue; }),
+  });
+};
 
 describe('result LLM configuration', () => {
   it('uses the managed proxy when the enabled user config has no API key', () => {
@@ -33,5 +45,20 @@ describe('result LLM configuration', () => {
 
     expect(resolved.enabled).toBe(false);
     expect(resolved.managedProxy).not.toBe(true);
+  });
+});
+
+describe('stored LLM configuration migration', () => {
+  it('enables the default trial for legacy users without a personal API key', () => {
+    stubStoredConfig({ ...defaultLlmConfig, enabled: false });
+
+    expect(loadLlmConfig().enabled).toBe(true);
+  });
+
+  it('preserves an explicit disabled choice after the new config has been saved', () => {
+    stubStoredConfig({});
+    saveLlmConfig({ ...defaultLlmConfig, enabled: false });
+
+    expect(loadLlmConfig().enabled).toBe(false);
   });
 });

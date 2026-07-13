@@ -2,6 +2,7 @@ import type { LlmConfig, LlmProvider } from '../types';
 import { isBilibiliVariant } from './appVariant';
 
 const LLM_CONFIG_KEY = 'tarot_llm_config_v1';
+const LLM_CONFIG_SCHEMA_VERSION = 2;
 
 export const llmProviderPresets: Record<LlmProvider, {
   label: string;
@@ -73,6 +74,7 @@ export const managedLlmConfig: LlmConfig = {
 
 interface StoredLlmConfig extends Partial<LlmConfig> {
   endpoint?: string;
+  schemaVersion?: number;
 }
 
 export const loadLlmConfig = (): LlmConfig => {
@@ -88,9 +90,13 @@ export const loadLlmConfig = (): LlmConfig => {
     if (stored.apiKey && !providerApiKeys[provider]) {
       providerApiKeys[provider] = stored.apiKey;
     }
+    const hasPersonalApiKey = Object.values(providerApiKeys).some((key) => Boolean(key?.trim()));
+    const shouldMigrateToTrial = stored.schemaVersion !== LLM_CONFIG_SCHEMA_VERSION
+      && !hasPersonalApiKey;
     return {
       ...defaultLlmConfig,
       ...stored,
+      enabled: shouldMigrateToTrial ? true : stored.enabled ?? defaultLlmConfig.enabled,
       provider,
       baseUrl: normalizeBaseUrl(stored.baseUrl ?? stored.endpoint ?? defaultLlmConfig.baseUrl),
       apiKey: providerApiKeys[provider] ?? stored.apiKey ?? '',
@@ -109,6 +115,7 @@ export const saveLlmConfig = (config: LlmConfig) => {
   };
   localStorage.setItem(LLM_CONFIG_KEY, JSON.stringify({
     ...config,
+    schemaVersion: LLM_CONFIG_SCHEMA_VERSION,
     baseUrl: normalizeBaseUrl(config.baseUrl),
     providerApiKeys,
   }));
