@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { DrawnCard, TarotCard } from '../types';
 
 const cardBackImage = new URL('../../assets/tarot/cards/card_back_default.webp', import.meta.url).href;
@@ -25,12 +26,33 @@ export function CardView({
   const activeCard = drawn?.card ?? card;
   const orientation = drawn?.orientation;
   const Element = onClick ? 'button' : 'div';
+  const fullImageUrl = activeCard?.image ?? '';
+  const [fullImageReady, setFullImageReady] = useState(false);
+
+  useEffect(() => {
+    setFullImageReady(false);
+    if (imageSize !== 'full' || !fullImageUrl) return undefined;
+
+    let cancelled = false;
+    const preloader = new Image();
+    preloader.decoding = 'async';
+    preloader.onload = () => {
+      if (!cancelled) setFullImageReady(true);
+    };
+    preloader.src = fullImageUrl;
+    if (preloader.complete) setFullImageReady(true);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fullImageUrl, imageSize]);
+
   const imageSource = activeCard
-    ? imageSize === 'full'
+    ? imageSize === 'full' && fullImageReady
       ? activeCard.image
       : activeCard.thumbnail
     : '';
-  const backImageSource = imageSize === 'full' ? cardBackImage : cardBackThumbnail;
+  const backImageSource = imageSize === 'full' && !activeCard ? cardBackImage : cardBackThumbnail;
 
   return (
     <Element

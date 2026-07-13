@@ -805,7 +805,12 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
                     key={drawn.position.id}
                     style={drawn.position.layoutArea ? { gridArea: drawn.position.layoutArea } : undefined}
                   >
-                    <CardView isBack={!isRevealed} drawn={drawn} />
+                    <CardView
+                      isBack={!isRevealed}
+                      drawn={drawn}
+                      imageSize="full"
+                      loading="eager"
+                    />
                     <span>{drawn.position.label}</span>
                   </article>
                 );

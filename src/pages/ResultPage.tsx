@@ -169,7 +169,7 @@ export function ResultPage({ reading, onRestart, onConfigure, onReadingUpdated }
           const llmCard = llmAnalysis?.cards[index];
           return (
             <article className="drawn-card-row" key={drawn.position.id}>
-              <CardView drawn={drawn} />
+              <CardView drawn={drawn} imageSize="full" loading={index < 2 ? 'eager' : 'lazy'} />
               <div>
                 <span>{drawn.position.label}</span>
                 <h3>{drawn.card.name} · {drawn.orientation === 'upright' ? '正位' : '逆位'}</h3>
