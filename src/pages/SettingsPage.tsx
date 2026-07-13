@@ -119,8 +119,8 @@ export function SettingsPage() {
 
         {apiKeyRequired ? (
           <div className="llm-config-guidance" role="alert">
-            <strong>还差一步：填写 API Key</strong>
-            <p>LLM 辅助解析已开启。请在下方填写所选服务商的 API Key，然后保存配置；建议再测试一次连接。</p>
+            <strong>当前使用默认 LLM 试用</strong>
+            <p>默认试用受每日次数限制。填写并保存自己的 API Key 后将直接使用你的 LLM，不受试用次数限制。</p>
           </div>
         ) : null}
 

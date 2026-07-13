@@ -666,7 +666,7 @@ const buildHeaders = (config: LlmConfig) => {
     headers.Authorization = `Bearer ${config.apiKey.trim()}`;
   }
   if (config.managedProxy && config.quotaKey) {
-    headers['X-Tarot-Reading-Id'] = config.quotaKey;
+    headers['X-Tarot-Trial-Id'] = config.quotaKey;
   }
   return headers;
 };

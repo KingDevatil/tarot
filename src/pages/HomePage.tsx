@@ -10,7 +10,7 @@ import {
 import { FormEvent, useState } from 'react';
 import { getSpread } from '../data/spreads';
 import { analyzeDivinationQuestion } from '../lib/llmAnalysis';
-import { loadLlmConfig } from '../lib/llmConfig';
+import { loadLlmConfig, resolveLlmConfig } from '../lib/llmConfig';
 import { createFreeformReadingInput } from '../lib/readingFlow';
 import type {
   AppView,
@@ -41,7 +41,7 @@ export function HomePage({
   const submitQuestion = async (event: FormEvent) => {
     event.preventDefault();
     setMessage('');
-    const llmConfig = loadLlmConfig();
+    const llmConfig = resolveLlmConfig(loadLlmConfig(), `question-${crypto.randomUUID()}`);
     setStatus('loading');
     try {
       const nextAnalysis = await analyzeDivinationQuestion(question, llmConfig);

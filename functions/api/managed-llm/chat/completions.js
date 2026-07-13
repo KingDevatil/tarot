@@ -20,9 +20,13 @@ export async function onRequestPost(context) {
     return jsonError(503, 'MANAGED_LLM_UNAVAILABLE', 'Managed LLM is not configured');
   }
 
-  const readingId = request.headers.get('X-Tarot-Reading-Id')?.trim() || '';
-  if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(readingId)) {
-    return jsonError(400, 'INVALID_READING_ID', 'A valid reading id is required');
+  const trialRequestId = (
+    request.headers.get('X-Tarot-Trial-Id')
+    || request.headers.get('X-Tarot-Reading-Id')
+    || ''
+  ).trim();
+  if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(trialRequestId)) {
+    return jsonError(400, 'INVALID_TRIAL_REQUEST_ID', 'A valid trial request id is required');
   }
 
   const contentLength = Number(request.headers.get('Content-Length') || 0);
@@ -52,7 +56,7 @@ export async function onRequestPost(context) {
 
   const usageDate = getUsageDate();
   const visitorHash = await sha256(`${env.RATE_LIMIT_SALT}:${ip}`);
-  const requestHash = await sha256(`${visitorHash}:${readingId}`);
+  const requestHash = await sha256(`${visitorHash}:${trialRequestId}`);
   await releaseStaleReservations(env.DB);
   context.waitUntil(cleanOldUsage(env.DB, usageDate));
 
@@ -160,9 +164,7 @@ function hasUsableContent(text) {
     const content = payload?.choices?.[0]?.message?.content;
     if (typeof content !== 'string' || !content.trim()) return false;
     const parsed = JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
-    return typeof parsed?.overview === 'string'
-      && Array.isArray(parsed?.cards)
-      && Array.isArray(parsed?.advice);
+    return Boolean(parsed) && typeof parsed === 'object' && !Array.isArray(parsed);
   } catch {
     return false;
   }

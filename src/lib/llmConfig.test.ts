@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { LlmConfig } from '../types';
-import { defaultLlmConfig, resolveResultLlmConfig } from './llmConfig';
+import { defaultLlmConfig, resolveLlmConfig } from './llmConfig';
 
 describe('result LLM configuration', () => {
   it('uses the managed proxy when the enabled user config has no API key', () => {
-    const resolved = resolveResultLlmConfig(defaultLlmConfig, 'reading-123');
+    const resolved = resolveLlmConfig(defaultLlmConfig, 'reading-123');
 
     expect(resolved.managedProxy).toBe(true);
     expect(resolved.baseUrl).toBe('/api/managed-llm');
@@ -18,15 +18,15 @@ describe('result LLM configuration', () => {
       model: 'personal-model',
       apiKey: 'personal-key',
     };
-    const resolved = resolveResultLlmConfig(personal, 'reading-456');
+    const resolved = resolveLlmConfig(personal, 'reading-456');
 
     expect(resolved.managedProxy).not.toBe(true);
     expect(resolved.apiKey).toBe('personal-key');
-    expect(resolved.quotaKey).toBe('reading-456');
+    expect(resolved.quotaKey).toBeUndefined();
   });
 
   it('does not enable the managed proxy after the user disables LLM analysis', () => {
-    const resolved = resolveResultLlmConfig(
+    const resolved = resolveLlmConfig(
       { ...defaultLlmConfig, enabled: false },
       'reading-789',
     );

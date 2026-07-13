@@ -124,10 +124,15 @@ export const isLlmConfigUsable = (config: LlmConfig) =>
 export const needsLlmApiKey = (config: LlmConfig) =>
   config.enabled && !config.privateChat && !config.apiKey.trim();
 
-export const resolveResultLlmConfig = (config: LlmConfig, readingId: string): LlmConfig => {
-  if (!config.enabled || isLlmConfigUsable(config)) return { ...config, quotaKey: readingId };
-  return { ...managedLlmConfig, quotaKey: readingId };
+export const resolveLlmConfig = (config: LlmConfig, trialRequestId: string): LlmConfig => {
+  if (!config.enabled || isLlmConfigUsable(config)) {
+    const { managedProxy: _managedProxy, quotaKey: _quotaKey, ...personalConfig } = config;
+    return personalConfig;
+  }
+  return { ...managedLlmConfig, quotaKey: trialRequestId };
 };
+
+export const resolveResultLlmConfig = resolveLlmConfig;
 
 export const applyLlmProviderPreset = (config: LlmConfig, provider: LlmProvider): LlmConfig => ({
   ...config,

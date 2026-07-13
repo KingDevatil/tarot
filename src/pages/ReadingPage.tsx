@@ -5,7 +5,7 @@ import { CardView } from '../components/CardView';
 import { paramOptions, questionCategories, topics } from '../data/questions';
 import { getChoiceOptionCount, getSpreadForReading } from '../data/spreads';
 import { generateLlmQuestion } from '../lib/llmAnalysis';
-import { isLlmConfigUsable, loadLlmConfig } from '../lib/llmConfig';
+import { isLlmConfigUsable, loadLlmConfig, resolveLlmConfig } from '../lib/llmConfig';
 import {
   buildQuestion,
   createDrawDeck,
@@ -204,7 +204,7 @@ export function ReadingPage({ initialInput, onComplete, onExit }: ReadingPagePro
         params,
         customContext,
         standardQuestion,
-        llmConfig,
+        resolveLlmConfig(llmConfig, `generation-${crypto.randomUUID()}`),
       );
       setGeneratedQuestions((current) => ({ ...current, [categoryId]: nextQuestion }));
       setQuestionGeneration({
